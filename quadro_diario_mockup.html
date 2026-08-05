@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Quadro Diário - Mockup</title>
+<style>
+  body { font-family: -apple-system, Segoe UI, Arial, sans-serif; background:#f2f1ec; color:#0b0b0b; max-width:720px; margin:40px auto; padding:0 20px; }
+  .topbar { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:20px; }
+  .title { font-size:20px; font-weight:600; }
+  .subtitle { font-size:12px; color:#666; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:10px; margin-bottom:24px; }
+  .card { background:#fff; border-radius:12px; padding:14px 16px; box-shadow:0 1px 2px rgba(0,0,0,.06); }
+  .card.warn { background:#FAEEDA; }
+  .card-label { font-size:12px; color:#666; margin-bottom:6px; }
+  .card-value { font-size:22px; font-weight:600; }
+  .card-arrow { font-size:12px; margin-left:4px; }
+  .panel { background:#fff; border-radius:12px; padding:16px 20px; margin-bottom:24px; box-shadow:0 1px 2px rgba(0,0,0,.06); }
+  .panel-title { font-size:13px; font-weight:600; margin-bottom:12px; }
+  select { font-size:13px; padding:6px 10px; border-radius:8px; border:1px solid #ccc; }
+  .compare-row { display:flex; justify-content:space-between; padding:8px 0; border-top:1px solid #eee; font-size:13px; }
+  .footer { border-top:1px solid #ddd; padding-top:12px; font-size:13px; color:#555; line-height:1.6; }
+  .footer-title { font-size:13px; font-weight:600; color:#666; margin-bottom:8px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="title">Almoxarifado PDL</div>
+    <div class="subtitle">quadro diário</div>
+  </div>
+  <div class="subtitle">seg, 03 de ago</div>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<div class="panel">
+  <div class="panel-title">comparar dois dias</div>
+  <div style="display:flex; gap:10px; align-items:center; margin-bottom:14px;">
+    <select id="dateA"></select>
+    <span>→</span>
+    <select id="dateB"></select>
+  </div>
+  <div id="compare"></div>
+</div>
+
+<div class="footer">
+  <div class="footer-title">avisos</div>
+  Retorno de materiais somente com chamado aprovado. Reunião bom dia às 08h00.
+</div>
+
+<script>
+const dates = ['15/jul','22/jul','27/jul','28/jul','29/jul','30/jul','31/jul'];
+const indicators = [
+  {label:'Linhas atendidas D009', values:{'15/jul':38,'22/jul':44,'27/jul':21,'28/jul':30,'29/jul':49,'30/jul':53,'31/jul':41}, warn:false},
+  {label:'Reservas pendentes', values:{'15/jul':12,'22/jul':15,'27/jul':23,'28/jul':26,'29/jul':16,'30/jul':18,'31/jul':32}, warn:true},
+  {label:'Itens sem endereço', values:{'15/jul':0,'22/jul':2,'27/jul':0,'28/jul':0,'29/jul':0,'30/jul':0,'31/jul':0}, warn:false},
+  {label:'Valor estoque R$MM', values:{'15/jul':29.10,'22/jul':28.95,'27/jul':28.70,'28/jul':28.69,'29/jul':28.65,'30/jul':28.59,'31/jul':28.54}, warn:false}
+];
+
+function spark(hist, color, w=100, h=26){
+  const max=Math.max(...hist), min=Math.min(...hist), range=max-min||1;
+  const pts = hist.map((v,i)=>`${(i/(hist.length-1))*w},${h-((v-min)/range)*h}`).join(' ');
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="26"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
+const grid = document.getElementById('grid');
+indicators.forEach(ind=>{
+  const hist = dates.slice(-5).map(d=>ind.values[d]);
+  const today = hist[hist.length-1], prev = hist[hist.length-2];
+  const up = today > prev, flat = today === prev;
+  const arrow = flat ? '' : (up ? '↑' : '↓');
+  const color = ind.warn ? '#BA7517' : '#0F6E56';
+  const card = document.createElement('div');
+  card.className = 'card' + (ind.warn ? ' warn' : '');
+  card.innerHTML = `<div class="card-label">${ind.label}</div>
+    <div><span class="card-value">${today}</span><span class="card-arrow" style="color:${color};">${arrow}</span></div>
+    ${spark(hist, color)}`;
+  grid.appendChild(card);
+});
+
+const selA = document.getElementById('dateA'), selB = document.getElementById('dateB');
+dates.forEach(d=>{
+  selA.innerHTML += `<option value="${d}" ${d==='15/jul'?'selected':''}>${d}</option>`;
+  selB.innerHTML += `<option value="${d}" ${d==='31/jul'?'selected':''}>${d}</option>`;
+});
+
+function renderCompare(){
+  const a = selA.value, b = selB.value;
+  const box = document.getElementById('compare');
+  box.innerHTML = indicators.map(ind=>{
+    const va = ind.values[a], vb = ind.values[b];
+    const diff = +(vb-va).toFixed(2);
+    const diffColor = diff===0 ? '#999' : (diff>0 ? '#BA7517' : '#0F6E56');
+    const sign = diff>0 ? '+' : '';
+    return `<div class="compare-row">
+      <span style="color:#666;">${ind.label}</span>
+      <span><span style="color:#999;">${va}</span> → <strong>${vb}</strong> <span style="color:${diffColor}; font-size:12px;">(${sign}${diff})</span></span>
+    </div>`;
+  }).join('');
+}
+selA.onchange = renderCompare; selB.onchange = renderCompare;
+renderCompare();
+</script>
+</body>
+</html>
