@@ -13,6 +13,21 @@
     --blue:#2079eb; --blue-bg:#dfebfd;
     --gray-900:#1c2430; --gray-700:#4a5568; --gray-500:#8a94a6; --gray-300:#e2e6ec; --gray-100:#f5f7fa;
     --bg:#f3f5f8; --card-bg:#ffffff; --border:#e6e9ef;
+
+    /* paleta exclusiva dos 20 cards de indicador do Início (prefixo ind-/classe ci-) — separada
+       de --green/--orange/--red/--purple/--blue acima de propósito: aquelas seguem em uso em
+       outros lugares (nav, painéis, Resumo do Mês, setas de delta) e não devem mudar junto.
+       8 cores escolhidas e validadas com o método do skill de dataviz (checagem de daltonismo
+       via simulação Machado-Oliveira-Fernandes + distância OKLab): nenhum par que fica
+       fisicamente vizinho no grid de 5 colunas cai abaixo do piso de separação. */
+    --ind-blue:#2a78d6;    --ind-blue-bg:#d9efff;
+    --ind-green:#008300;   --ind-green-bg:#dcf5da;
+    --ind-red:#e34948;     --ind-red-bg:#ffe2de;
+    --ind-violet:#4a3aa7;  --ind-violet-bg:#e8eaff;
+    --ind-orange:#eb6834;  --ind-orange-bg:#ffe4d6;
+    --ind-aqua:#1baf7a;    --ind-aqua-bg:#d3f7e4;
+    --ind-yellow:#eda100;  --ind-yellow-bg:#ffe9cc;
+    --ind-magenta:#e87ba4; --ind-magenta-bg:#ffe1ed;
   }
   html, body{height:100%; overflow:hidden;}
   *{box-sizing:border-box; margin:0; padding:0;}
@@ -120,6 +135,18 @@
   .c-purple .icon-badge{background:var(--purple-bg); color:var(--purple);}
   .c-blue .icon-badge{background:var(--blue-bg); color:var(--blue);}
 
+  /* paleta dos 20 cards de indicador (ver --ind-* no :root) — escopada com .card. na frente
+     de propósito, pra nunca colidir com .chart-card/.stat-card do Resumo do Mês mesmo que
+     algum nome de cor se repita */
+  .card.ci-blue .icon-badge{background:var(--ind-blue-bg); color:var(--ind-blue);}
+  .card.ci-green .icon-badge{background:var(--ind-green-bg); color:var(--ind-green);}
+  .card.ci-red .icon-badge{background:var(--ind-red-bg); color:var(--ind-red);}
+  .card.ci-violet .icon-badge{background:var(--ind-violet-bg); color:var(--ind-violet);}
+  .card.ci-orange .icon-badge{background:var(--ind-orange-bg); color:var(--ind-orange);}
+  .card.ci-aqua .icon-badge{background:var(--ind-aqua-bg); color:var(--ind-aqua);}
+  .card.ci-yellow .icon-badge{background:var(--ind-yellow-bg); color:var(--ind-yellow);}
+  .card.ci-magenta .icon-badge{background:var(--ind-magenta-bg); color:var(--ind-magenta);}
+
   /* ---------- Coluna de painéis (lateral direita) ---------- */
   /* largura travada; os 4 painéis dividem a altura da coluna em partes iguais, empilhados */
   .panels-col{flex:0 0 280px; height:100%; min-height:0; display:flex; flex-direction:column; gap:8px;}
@@ -177,7 +204,148 @@
   .info-bar-item svg{width:13px; height:13px; color:var(--gray-500); flex-shrink:0;}
   .info-bar-item b{font-weight:700; color:var(--gray-900);}
 
-  /* fallback: só entra em modo rolagem em janelas realmente minúsculas (ex: DevTools mobile), nunca em notebook/TV normais */
+  /* ---------- Calendário ---------- */
+  /* Dashboard (grid de 20 cards + 4 painéis, mesmo padrão do Início) sempre visível — igual
+     ao Início. O calendário é um popover compacto de verdade (tamanho de date-picker normal),
+     ancorado embaixo da barra de troca de data, sobrepondo o conteúdo sem escondê-lo — fecha
+     sozinho ao selecionar um dia válido ou ao clicar fora dele (ver o listener de click-outside
+     no JS). */
+  #screen-calendario.active{gap:10px;}
+
+  .cal-topbar{flex:0 0 auto; display:flex; position:relative;}
+  .cal-toggle{
+    display:flex; align-items:center; gap:7px; background:#fff; border:1px solid var(--border);
+    border-radius:18px; padding:6px 14px; font-size:12px; font-weight:700; color:var(--gray-700);
+  }
+  .cal-toggle svg{width:13px; height:13px; color:var(--gray-500); flex-shrink:0;}
+  .cal-toggle b{color:var(--gray-900);}
+  .cal-toggle-chev{transition:transform .15s ease;}
+  #screen-calendario.cal-open .cal-toggle-chev{transform:rotate(180deg);}
+
+  /* popover: fora do fluxo normal (position:absolute), tamanho fixo pequeno — não empurra nem
+     substitui o dashboard embaixo */
+  .cal-picker{
+    display:none; position:absolute; top:calc(100% + 8px); left:0; z-index:30;
+    width:266px; background:var(--card-bg); border:1px solid var(--border); border-radius:12px;
+    padding:10px 12px; box-shadow:0 10px 28px rgba(28,36,48,.16);
+  }
+  #screen-calendario.cal-open .cal-picker{display:block;}
+
+  .cal-card{display:flex; flex-direction:column; gap:6px;}
+  .cal-head{display:flex; align-items:center; justify-content:center; gap:10px; flex:0 0 auto;}
+  .cal-month-label{font-size:12.5px; font-weight:800; color:var(--gray-900); min-width:100px; text-align:center;}
+  .cal-nav{
+    width:20px; height:20px; border-radius:50%; border:1px solid var(--border); background:#fff;
+    display:flex; align-items:center; justify-content:center; color:var(--gray-700); flex-shrink:0;
+  }
+  .cal-nav svg{width:10px; height:10px;}
+  .cal-nav:disabled{opacity:.3; cursor:not-allowed;}
+
+  .cal-weekdays{
+    display:grid; grid-template-columns:repeat(7,1fr); flex:0 0 auto;
+    font-size:8.5px; font-weight:800; letter-spacing:.02em; color:var(--gray-500); text-align:center;
+  }
+
+  .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); grid-template-rows:repeat(6,28px); gap:2px;}
+  .cal-day{
+    border:none; border-radius:6px; background:var(--gray-100); color:var(--gray-900);
+    font-size:11px; font-weight:700; font-family:inherit; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  /* dias do mês anterior/seguinte que completam a grade — sempre esmaecidos, nunca clicáveis
+     (mesmo quando caem dentro da safra e não são futuros: só existem pra fechar a semana) */
+  .cal-day-out{background:none; color:var(--gray-300); cursor:default;}
+  /* fora da safra (antes de 01/04/2026 ou depois de 31/03/2027) OU depois de hoje — mesmo
+     tratamento visual pras duas regras, ambas significam "sem dado disponível" */
+  .cal-day-blocked{background:none; color:var(--gray-300); cursor:not-allowed;}
+  .cal-day-today{box-shadow:inset 0 0 0 1.6px var(--green);}
+  .cal-day-selected{background:var(--green); color:#fff;}
+  .cal-day-selected.cal-day-today{box-shadow:none;}
+
+  /* dashboard: grid de 20 cards + painéis, lado a lado — mesmo layout do #screen-inicio.active */
+  .cal-dashboard{display:flex; flex-direction:row; gap:14px; flex:1; min-height:0;}
+
+  /* ---------- Resumo do Mês ---------- */
+  /* 4 linhas verticais: cabeçalho, linha-topo (KPIs empilhados + os 2 gráficos de barra lado a
+     lado), estatísticas, SKUs Zerados. Cabeçalho/linha-topo são flex:0 0 auto (tamanho mínimo
+     pelo conteúdo, compactados de propósito); estatísticas e SKUs Zerados dividem toda a sobra
+     na proporção 20/80 (flex-grow 1 vs 4) — sem rolagem, mesmo padrão do Início. min-height nos
+     gráficos é só o piso testado abaixo do qual barras somem/texto amontoa. */
+  #screen-resumo.active{gap:6px;}
+
+  .resumo-header{display:flex; align-items:center; justify-content:space-between; gap:10px; flex:0 0 auto;}
+  .resumo-title h1{font-size:13px; font-weight:800; color:var(--gray-900); line-height:1.1;}
+  .resumo-title p{font-size:8px; color:var(--gray-500); margin-top:0; line-height:1.1;}
+
+  .resumo-selectors{display:flex; align-items:stretch; gap:5px; flex-shrink:0;}
+  .selector-box{
+    background:var(--card-bg); border:1px solid var(--border); border-radius:6px;
+    padding:2px 7px; display:flex; flex-direction:column; justify-content:center; gap:0;
+  }
+  .selector-label{font-size:6px; font-weight:800; letter-spacing:.05em; color:var(--gray-500); line-height:1.2;}
+  .selector-control{display:flex; align-items:center; gap:2px; position:relative;}
+  .selector-control svg{width:9px; height:9px; color:var(--gray-500); flex-shrink:0;}
+  .selector-control select{
+    border:none; background:none; font-size:9px; font-weight:700; color:var(--gray-900);
+    font-family:inherit; cursor:pointer; -webkit-appearance:none; appearance:none; padding-right:10px; line-height:1.2;
+  }
+  .selector-control::after{
+    content:''; position:absolute; right:0; top:50%; width:4px; height:4px;
+    border-right:1.3px solid var(--gray-500); border-bottom:1.3px solid var(--gray-500);
+    transform:translateY(-70%) rotate(45deg); pointer-events:none;
+  }
+  .deposito-box .deposito-fixo{display:flex; align-items:center; gap:2px; font-size:9px; font-weight:800; color:var(--green); line-height:1.2;}
+  .deposito-box .deposito-fixo svg{width:9px; height:9px;}
+  .deposito-box .selector-sub{font-size:6px; color:var(--gray-500); white-space:nowrap; line-height:1.1;}
+
+  /* linha única: coluna de KPIs empilhada (estreita, largura fixa) + os 2 gráficos de barra
+     dividindo o espaço restante — antes eram 2 linhas separadas; fundir libera uma linha
+     inteira de altura pro resto da tela. */
+  .resumo-top-row{display:flex; gap:6px; flex:0 0 auto; min-height:150px;}
+
+  .resumo-kpis{display:flex; flex-direction:column; gap:6px; flex:0 0 210px;}
+  .kpi-box{
+    flex:1; background:var(--card-bg); border:1px solid var(--border); border-radius:9px;
+    padding:5px 12px; display:flex; flex-direction:column; justify-content:center; gap:1px;
+  }
+  .kpi-box .kpi-label{font-size:8px; font-weight:800; letter-spacing:.04em; color:var(--gray-500);}
+  .kpi-box .kpi-value{font-size:19px; font-weight:800; letter-spacing:-.01em;}
+  .kpi-box .kpi-sub{font-size:8px; color:var(--gray-500);}
+
+  .resumo-charts-row{display:flex; gap:6px; flex:1; min-width:0;}
+  .chart-card{
+    flex:1; background:var(--card-bg); border:1px solid var(--border); border-radius:9px;
+    padding:6px 10px; display:flex; flex-direction:column; gap:1px; min-height:0; min-width:0;
+  }
+  .chart-card .chart-head{display:flex; align-items:center; gap:4px; flex:0 0 auto;}
+  .chart-card .chart-head .icon-badge{width:15px; height:15px;}
+  .chart-card .chart-head svg{width:9px; height:9px;}
+  .chart-title{font-size:9.5px; font-weight:800; color:var(--gray-900);}
+  .chart-sub{font-size:8px; color:var(--gray-500); margin:-1px 0 1px 19px;}
+  .chart-body{flex:1; min-height:0;}
+  .chart-body svg{width:100%; height:100%; display:block;}
+
+  /* recebe 20% do espaço vertical liberado pela fusão das linhas acima (flex-grow:1 contra o
+     flex-grow:4 do bloco 5 — ver .chart-card-wide — distribui 20/80 exatamente) */
+  .resumo-stats-row{display:flex; gap:6px; flex:1 1 auto;}
+  .stat-card{
+    flex:1; background:var(--card-bg); border:1px solid var(--border); border-radius:9px;
+    padding:6px 10px; display:flex; flex-direction:column; justify-content:center; gap:3px;
+  }
+  .stat-card .chart-head{display:flex; align-items:center; gap:4px;}
+  .stat-card .chart-head .icon-badge{width:15px; height:15px;}
+  .stat-card .chart-head svg{width:9px; height:9px;}
+  .stat-fields{display:flex; gap:12px;}
+  .stat-field{display:flex; flex-direction:column; gap:0;}
+  .stat-field-label{font-size:7px; font-weight:700; color:var(--gray-500); letter-spacing:.03em;}
+  .stat-field-value{font-size:14px; font-weight:800;}
+  .stat-field-sub{font-size:8px; color:var(--gray-500);}
+
+  /* gráfico mais importante da tela — recebe 80% do espaço vertical liberado (flex-grow:4
+     contra o flex-grow:1 da .resumo-stats-row, ratio 4:1 = 80/20 exato). min-height é só o
+     piso testado abaixo do qual os rótulos de valor por dia ficam ilegíveis. */
+  .chart-card-wide{flex:4 1 auto; min-height:160px;}
+
   @media (max-width:640px), (max-height:420px){
     html, body{height:auto; overflow:auto;}
     .shell{height:auto; overflow:visible;}
@@ -312,10 +480,71 @@
 
     <!-- ===================== PLACEHOLDERS ===================== -->
     <section class="screen" id="screen-calendario">
-      <div class="placeholder">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
-        <h2>Calendário</h2>
-        <p>Estrutura de navegação criada. Lógica funcional será implementada em fase futura.</p>
+      <div class="cal-topbar">
+        <button class="cal-toggle" id="calToggleBtn" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+          Dia selecionado: <b id="calBarDateLabel"></b>
+          <svg class="cal-toggle-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+
+        <div class="cal-picker" id="calPicker">
+          <div class="cal-card">
+            <div class="cal-head">
+              <button class="cal-nav" id="calPrevBtn" type="button" aria-label="Mês anterior">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 6l-6 6 6 6"/></svg>
+              </button>
+              <span class="cal-month-label" id="calMonthLabel">Abril 2026</span>
+              <button class="cal-nav" id="calNextBtn" type="button" aria-label="Próximo mês">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
+              </button>
+            </div>
+            <div class="cal-weekdays">
+              <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
+            </div>
+            <div class="cal-grid" id="calGrid"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cal-dashboard">
+        <div class="grid" id="calCardGrid"></div>
+
+        <div class="panels-col">
+          <div class="panel p-alert">
+            <div class="panel-head">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+              Pontos de Atenção
+            </div>
+            <ul class="bullet-list" id="calAttentionList"></ul>
+          </div>
+
+          <div class="panel p-notice">
+            <div class="panel-head">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+              Avisos Importantes
+            </div>
+            <ul class="bullet-list" id="calNoticeList"></ul>
+          </div>
+
+          <div class="panel p-receipt">
+            <div class="panel-head">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 10h13l4 4h5v6H1z"/><circle cx="6" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M14 10V5H4v5"/></svg>
+              Recebimento do Dia
+            </div>
+            <div class="panel-empty">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 10h13l4 4h5v6H1z"/><circle cx="6" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M14 10V5H4v5"/></svg>
+              Fonte de dado ainda não definida
+            </div>
+          </div>
+
+          <div class="panel p-vacation">
+            <div class="panel-head">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c.6-3.6 3.3-6 6.5-6s5.9 2.4 6.5 6"/><circle cx="18" cy="8" r="2.6"/><path d="M16 14.2c2.6.4 4.6 2.6 5 5.8"/></svg>
+              Férias / Ausências
+            </div>
+            <div class="bullet-list vacation-list" id="calVacationList"></div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -328,11 +557,45 @@
     </section>
 
     <section class="screen" id="screen-resumo">
-      <div class="placeholder">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l4 4v14H6z"/><path d="M10 12h6M10 16h6"/></svg>
-        <h2>Resumo do Mês</h2>
-        <p>Estrutura de navegação criada. Lógica funcional será implementada em fase futura.</p>
+      <div class="resumo-header">
+        <div class="resumo-title">
+          <h1>Resumo do Mês</h1>
+          <p>Resumo completo do desempenho do mês selecionado (D009)</p>
+        </div>
+        <div class="resumo-selectors">
+          <div class="selector-box">
+            <span class="selector-label">MÊS</span>
+            <div class="selector-control">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+              <select id="resumoMesSelect">
+                <option>Julho/2026</option>
+                <option>Junho/2026</option>
+                <option>Maio/2026</option>
+              </select>
+            </div>
+          </div>
+          <div class="selector-box deposito-box">
+            <span class="selector-label">DEPÓSITO</span>
+            <div class="deposito-fixo">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M6 21V8l6-4 6 4v13M9 21v-6h6v6"/></svg>
+              D009
+            </div>
+            <span class="selector-sub">Depósito fixo desta consulta</span>
+          </div>
+        </div>
       </div>
+
+      <div class="resumo-top-row">
+        <div class="resumo-kpis" id="resumoKpis"></div>
+        <div class="resumo-charts-row">
+          <div class="chart-card c-green" id="chartOrdensReservas"></div>
+          <div class="chart-card c-purple" id="chartTop5Centro"></div>
+        </div>
+      </div>
+
+      <div class="resumo-stats-row" id="resumoStatsRow"></div>
+
+      <div class="chart-card c-orange chart-card-wide" id="chartSkusZerados"></div>
     </section>
 
     <section class="screen" id="screen-gestao-estoque">
@@ -404,6 +667,7 @@ const ICONS = {
   scan:     '<path d="M4 7V5a2 2 0 0 1 2-2h2M20 7V5a2 2 0 0 0-2-2h-2M4 17v2a2 2 0 0 0 2 2h2M20 17v2a2 2 0 0 1-2 2h-2M3 12h18"/>',
   undo:     '<path d="M9 14l-5-5 5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
   truck:    '<rect x="1" y="3" width="15" height="13" rx="1"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.2"/><circle cx="18.5" cy="18.5" r="2.2"/>',
+  lineChart: '<path d="M4 19h16"/><path d="M4 19V5"/><path d="M7 15l3-4 3 3 5-8"/>',
 };
 
 function svg(iconKey){
@@ -457,36 +721,50 @@ function sparkline(points, color){
 
 const COLOR_HEX = { green:'#0fa858', orange:'#f0900f', red:'#ea3826', purple:'#7c4ce0', blue:'#2079eb' };
 
+/* paleta exclusiva dos 20 cards do Início — NÃO é a mesma COLOR_HEX acima (aquela segue em uso
+   no Resumo do Mês, painéis, deltas). 8 cores, validadas com o método do skill de dataviz
+   (checagem de daltonismo via simulação Machado-Oliveira-Fernandes + distância OKLab): dentro
+   de {blue,green,red,violet} e dentro de {orange,aqua,yellow,magenta} nenhum par fica abaixo do
+   piso de separação, e a atribuição por card foi escolhida pra nenhuma dessas 8 combinações de
+   risco (orange-yellow, orange-magenta, orange-red, orange-green) ficar fisicamente vizinha no
+   grid de 5 colunas — ver mapeamento card a card abaixo. */
+const IND_COLOR_HEX = {
+  blue:'#2a78d6', green:'#008300', red:'#e34948', violet:'#4a3aa7',
+  orange:'#eb6834', aqua:'#1baf7a', yellow:'#eda100', magenta:'#e87ba4',
+};
+
 /* dados fixos/fictícios — Fase 1a. Fase 1b substitui isto por leitura do JSON real.
    20 indicadores em 3 blocos + 2 soltos (ver spec: Inventário Rotativo virou 2 cards, um por
-   depósito, no lugar do card único que existia antes). */
+   depósito, no lugar do card único que existia antes). Cor de cada card: 4 cores exclusivas
+   pros 4 pares D009/D016 (1+2, 3+4, 5+6, 7+8), as outras 4 cores dividem os cards 9-20 em
+   trios (ver comentário do IND_COLOR_HEX acima). */
 const BLOCK1 = [ // Fluxo do Dia
-  { n:1, title:'Linhas Atendidas D009',    value:'21', yesterday:'18', deltaPct:16.7, dir:'up',   color:'green', icon:'trendUp', spark:[9,12,11,15,14,18,17,21] },
-  { n:2, title:'Linhas Atendidas D016',    value:'0',  yesterday:'0',  deltaPct:0,    dir:'flat', color:'green', icon:'check',   spark:[0,0,0,0,0,0,0,0] },
-  { n:3, title:'Recebimentos D009',        value:'8',  yesterday:'6',  deltaPct:33.3, dir:'up',   color:'blue',  icon:'truck',   spark:[4,5,4,6,5,7,6,8] },
-  { n:4, title:'Recebimentos D016',        value:'3',  yesterday:'2',  deltaPct:50.0, dir:'up',   color:'blue',  icon:'truck',   spark:[1,2,1,2,2,1,2,3] },
-  { n:5, title:'Estornos D009',            value:'3',  yesterday:'2',  deltaPct:50.0, dir:'up',   color:'red',   icon:'undo',    spark:[1,2,1,2,2,1,2,3] },
-  { n:6, title:'Estornos D016',            value:'1',  yesterday:'1',  deltaPct:0,    dir:'flat', color:'red',   icon:'undo',    spark:[1,1,1,1,1,1,1,1] },
-  { n:7, title:'Inventário Rotativo D009', value:'10', yesterday:'13', deltaPct:-23.1,dir:'down', color:'blue',  icon:'refresh', spark:[19,17,18,15,14,12,11,10] },
-  { n:8, title:'Inventário Rotativo D016', value:'7',  yesterday:'9',  deltaPct:-22.2,dir:'down', color:'blue',  icon:'refresh', spark:[13,12,11,10,9,8,8,7] },
+  { n:1, title:'Linhas Atendidas D009',    value:'90', yesterday:'65', deltaPct:38.5, dir:'up',   color:'blue', icon:'trendUp', spark:[9,12,11,15,14,18,17,21] },
+  { n:2, title:'Linhas Atendidas D016',    value:'0',  yesterday:'0',  deltaPct:0.0,    dir:'flat', color:'blue', icon:'check',   spark:[0,0,0,0,0,0,0,0] },
+  { n:3, title:'Recebimentos D009',        value:'2',  yesterday:'35',  deltaPct:-94.3, dir:'down',   color:'green',  icon:'truck',   spark:[4,5,4,6,5,7,6,8] },
+  { n:4, title:'Recebimentos D016',        value:'0',  yesterday:'1',  deltaPct:-100.0, dir:'down',   color:'green',  icon:'truck',   spark:[1,2,1,2,2,1,2,3] },
+  { n:5, title:'Estornos D009',            value:'0',  yesterday:'0',  deltaPct:0.0, dir:'flat',   color:'red',   icon:'undo',    spark:[1,2,1,2,2,1,2,3] },
+  { n:6, title:'Estornos D016',            value:'0',  yesterday:'0',  deltaPct:0.0,    dir:'flat', color:'red',   icon:'undo',    spark:[1,1,1,1,1,1,1,1] },
+  { n:7, title:'Inventário Rotativo D009', value:'67', yesterday:'91', deltaPct:-26.4,dir:'down', color:'violet',  icon:'refresh', spark:[19,17,18,15,14,12,11,10] },
+  { n:8, title:'Inventário Rotativo D016', value:'0',  yesterday:'4',  deltaPct:-100.0,dir:'down', color:'violet',  icon:'refresh', spark:[13,12,11,10,9,8,8,7] },
 ];
 const BLOCK2 = [ // Pendências
-  { n:9,  title:'Pendências Atendimento Linhas', value:'32', yesterday:'25', deltaPct:28.0,  dir:'up',   color:'orange', icon:'alertCircle',    spark:[19,22,20,25,23,28,25,32] },
-  { n:10, title:'Reservas Pendentes',            value:'23', yesterday:'18', deltaPct:27.8,  dir:'up',   color:'red',    icon:'clipboard',      spark:[11,14,12,17,15,19,17,23] },
-  { n:11, title:'Contagem Pendentes',            value:'0',  yesterday:'0',  deltaPct:0,     dir:'flat', color:'purple', icon:'clipboardCheck', spark:[0,0,0,0,0,0,0,0] },
-  { n:12, title:'NF Pendente Faturamento',       value:'6',  yesterday:'7',  deltaPct:-14.3, dir:'down', color:'orange', icon:'doc',            spark:[10,9,11,8,9,7,8,6] },
-  { n:13, title:'Devolução',                     value:'2',  yesterday:'1',  deltaPct:100,   dir:'up',   color:'blue',   icon:'refresh',        spark:[0,1,0,1,1,0,1,2] },
+  { n:9,  title:'Pendências Atendimento Linhas', value:'76', yesterday:'25', deltaPct:28.0,  dir:'up',   color:'magenta', icon:'alertCircle',    spark:[19,22,20,25,23,28,25,32] },
+  { n:10, title:'Reservas Pendentes',            value:'30', yesterday:'18', deltaPct:27.8,  dir:'up',   color:'aqua',    icon:'clipboard',      spark:[11,14,12,17,15,19,17,23] },
+  { n:11, title:'Notas Aguardando Lançamento',   value:'0',  yesterday:'0',  deltaPct:0,     dir:'flat', color:'yellow', icon:'clipboardCheck', spark:[0,0,0,0,0,0,0,0] },
+  { n:12, title:'NF Pendente Faturamento',       value:'6',  yesterday:'7',  deltaPct:-14.3, dir:'down', color:'magenta', icon:'doc',            spark:[10,9,11,8,9,7,8,6] },
+  { n:13, title:'Devolução',                     value:'2',  yesterday:'1',  deltaPct:100,   dir:'up',   color:'magenta',   icon:'refresh',        spark:[0,1,0,1,1,0,1,2] },
 ];
 const BLOCK3 = [ // Fotografia do Estoque
-  { n:14, title:'Itens em Estoque com Saldo', value:'5.364', yesterday:'5.345', deltaPct:0.36, dir:'up',   color:'green',  icon:'box',     spark:[5300,5320,5310,5335,5325,5350,5340,5364] },
-  { n:15, title:'Valor do Estoque Total',     value:'28,70', yesterday:'28,59', deltaPct:0.39, dir:'up',   color:'purple', icon:'cash',    spark:[28.0,28.15,28.05,28.3,28.2,28.45,28.35,28.7] },
-  { n:16, title:'Itens MRP Saldo Zero',       value:'156',   yesterday:'160',   deltaPct:-2.5, dir:'down', color:'red',    icon:'warnTri', spark:[169,166,167,162,163,159,158,156] },
-  { n:17, title:'Curva ABC',                  value:'30',    yesterday:'30',    deltaPct:0,    dir:'flat', color:'purple', icon:'abcBars', spark:[30,30,30,30,30,30,30,30] },
-  { n:18, title:'Itens sem Endereço',         value:'0',     yesterday:'0',     deltaPct:0,    dir:'flat', color:'orange', icon:'pin',     spark:[0,0,0,0,0,0,0,0] },
+  { n:14, title:'Itens em Estoque com Saldo', value:'5.106', yesterday:'5.345', deltaPct:0.36, dir:'up',   color:'aqua',  icon:'box',     spark:[5300,5320,5310,5335,5325,5350,5340,5364] },
+  { n:15, title:'Valor do Estoque Total',     value:'24.852', yesterday:'28,59', deltaPct:0.39, dir:'up',   color:'orange', icon:'cash',    spark:[28.0,28.15,28.05,28.3,28.2,28.45,28.35,28.7] },
+  { n:16, title:'Itens MRP Saldo Zero',       value:'297',   yesterday:'160',   deltaPct:-2.5, dir:'down', color:'yellow',    icon:'warnTri', spark:[169,166,167,162,163,159,158,156] },
+  { n:17, title:'Curva ABC',                  value:'30',    yesterday:'30',    deltaPct:0,    dir:'flat', color:'yellow', icon:'abcBars', spark:[30,30,30,30,30,30,30,30] },
+  { n:18, title:'Itens sem Endereço',         value:'14',     yesterday:'0',     deltaPct:0,    dir:'flat', color:'aqua', icon:'pin',     spark:[0,0,0,0,0,0,0,0] },
 ];
 const LOOSE = [ // soltos, sem bloco
-  { n:19, title:'Intercompany',            value:'2', yesterday:'2', deltaPct:0, dir:'flat', color:'blue',  icon:'docLine', spark:[2,2,2,2,2,2,2,2] },
-  { n:20, title:'Scanner de Documentos',   value:'0', yesterday:'0', deltaPct:0, dir:'flat', color:'green', icon:'scan',    spark:[0,0,0,0,0,0,0,0] },
+  { n:19, title:'Intercompany',            value:'2', yesterday:'2', deltaPct:0, dir:'flat', color:'orange',  icon:'docLine', spark:[2,2,2,2,2,2,2,2] },
+  { n:20, title:'Scanner de Documentos',   value:'0', yesterday:'0', deltaPct:0, dir:'flat', color:'orange', icon:'scan',    spark:[0,0,0,0,0,0,0,0] },
 ];
 
 function deltaHtml(c){
@@ -501,15 +779,20 @@ function deltaHtml(c){
 }
 
 function cardHtml(c){
+  /* noCompare: dia excepcional de fim de semana/feriado com movimentação — sem base de
+     comparação válida pra esse dia específico (ver mockCardsForDate) */
+  const compareHtml = c.noCompare
+    ? `<span class="delta flat">Sem comparação (dia atípico)</span>`
+    : `Ontem: ${c.yesterday} ${deltaHtml(c)}`;
   return `
-    <div class="card c-${c.color}">
+    <div class="card ci-${c.color}">
       <div class="card-top">
         <div class="icon-badge">${svg(c.icon)}</div>
         <div class="card-title">${c.n}. ${c.title}</div>
       </div>
       <div class="card-value">${c.value}</div>
-      <div class="card-compare">Ontem: ${c.yesterday} ${deltaHtml(c)}</div>
-      ${sparkline(c.spark, COLOR_HEX[c.color])}
+      <div class="card-compare">${compareHtml}</div>
+      ${sparkline(c.spark, IND_COLOR_HEX[c.color])}
     </div>
   `;
 }
@@ -520,6 +803,341 @@ function renderCards(){
   document.getElementById('cardGrid').innerHTML = CARDS.map(cardHtml).join('');
 }
 renderCards();
+
+/* ================= Calendário — Fase 1a/parcial: navegação + regras de bloqueio reais.
+   Dos 20 cards, 9 já usam dado REAL (histórico da MB51, ver HISTORICO_MB51 abaixo) quando a
+   data selecionada tem registro; os outros 11 (ZMM028/MB25/Curva ABC/manuais) continuam mock —
+   essa fonte ainda não existe, tratada em etapa separada. ================= */
+const MONTH_NAMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+/* Histórico real dos 9 indicadores da MB51 (Bloco 1 + Intercompany), gerado por
+   backend/historico.py a partir do extrato real (não é mock) — 01/04/2026 a 08/08/2026.
+   Embutido direto como constante (em vez de fetch) porque o site roda como arquivo local
+   (file://), onde fetch() de JSON esbarra em CORS no navegador. Reexportar/regenerar: rodar
+   `python -m backend.historico --data-inicio 01/04/2026 --arquivo-mb51 "<caminho>"` e colar o
+   conteúdo do historico_mb51.json aqui (formato idêntico: {'aaaa-mm-dd': {9 campos}, ...}). */
+const HISTORICO_MB51 = {"2026-04-01":{"linhas_atendidas_d009":43,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":24,"recebimentos_d016":2,"inventario_rotativo_d009":52,"inventario_rotativo_d016":3,"intercompany":0},"2026-04-02":{"linhas_atendidas_d009":74,"linhas_atendidas_d016":0,"estornos_d009":2,"estornos_d016":0,"recebimentos_d009":24,"recebimentos_d016":1,"inventario_rotativo_d009":70,"inventario_rotativo_d016":3,"intercompany":0},"2026-04-03":{"linhas_atendidas_d009":2,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":11,"recebimentos_d016":0,"inventario_rotativo_d009":21,"inventario_rotativo_d016":0,"intercompany":0},"2026-04-04":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-04-05":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-04-06":{"linhas_atendidas_d009":52,"linhas_atendidas_d016":1,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":4,"recebimentos_d016":0,"inventario_rotativo_d009":62,"inventario_rotativo_d016":1,"intercompany":0},"2026-04-07":{"linhas_atendidas_d009":54,"linhas_atendidas_d016":34,"estornos_d009":2,"estornos_d016":0,"recebimentos_d009":2,"recebimentos_d016":1,"inventario_rotativo_d009":53,"inventario_rotativo_d016":19,"intercompany":2},"2026-04-08":{"linhas_atendidas_d009":93,"linhas_atendidas_d016":41,"estornos_d009":3,"estornos_d016":0,"recebimentos_d009":11,"recebimentos_d016":1,"inventario_rotativo_d009":95,"inventario_rotativo_d016":30,"intercompany":3},"2026-04-09":{"linhas_atendidas_d009":71,"linhas_atendidas_d016":16,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":21,"recebimentos_d016":1,"inventario_rotativo_d009":62,"inventario_rotativo_d016":6,"intercompany":0},"2026-04-10":{"linhas_atendidas_d009":52,"linhas_atendidas_d016":14,"estornos_d009":1,"estornos_d016":0,"recebimentos_d009":1,"recebimentos_d016":0,"inventario_rotativo_d009":111,"inventario_rotativo_d016":14,"intercompany":0},"2026-04-11":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-04-12":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-04-13":{"linhas_atendidas_d009":74,"linhas_atendidas_d016":48,"estornos_d009":8,"estornos_d016":48,"recebimentos_d009":2,"recebimentos_d016":0,"inventario_rotativo_d009":82,"inventario_rotativo_d016":36,"intercompany":0},"2026-04-14":{"linhas_atendidas_d009":64,"linhas_atendidas_d016":11,"estornos_d009":3,"estornos_d016":2,"recebimentos_d009":1,"recebimentos_d016":0,"inventario_rotativo_d009":57,"inventario_rotativo_d016":11,"intercompany":0},"2026-04-15":{"linhas_atendidas_d009":41,"linhas_atendidas_d016":1,"estornos_d009":1,"estornos_d016":0,"recebimentos_d009":1,"recebimentos_d016":3,"inventario_rotativo_d009":46,"inventario_rotativo_d016":5,"intercompany":1},"2026-04-16":{"linhas_atendidas_d009":46,"linhas_atendidas_d016":31,"estornos_d009":2,"estornos_d016":2,"recebimentos_d009":21,"recebimentos_d016":0,"inventario_rotativo_d009":81,"inventario_rotativo_d016":32,"intercompany":0},"2026-04-17":{"linhas_atendidas_d009":47,"linhas_atendidas_d016":4,"estornos_d009":0,"estornos_d016":1,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":48,"inventario_rotativo_d016":7,"intercompany":0},"2026-04-18":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-04-19":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-04-20":{"linhas_atendidas_d009":39,"linhas_atendidas_d016":10,"estornos_d009":2,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":37,"inventario_rotativo_d016":10,"intercompany":0},"2026-04-21":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-04-22":{"linhas_atendidas_d009":59,"linhas_atendidas_d016":5,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":9,"recebimentos_d016":0,"inventario_rotativo_d009":67,"inventario_rotativo_d016":5,"intercompany":0},"2026-04-23":{"linhas_atendidas_d009":69,"linhas_atendidas_d016":42,"estornos_d009":3,"estornos_d016":1,"recebimentos_d009":19,"recebimentos_d016":0,"inventario_rotativo_d009":76,"inventario_rotativo_d016":28,"intercompany":0},"2026-04-24":{"linhas_atendidas_d009":46,"linhas_atendidas_d016":3,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":1,"recebimentos_d016":0,"inventario_rotativo_d009":42,"inventario_rotativo_d016":3,"intercompany":0},"2026-04-25":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-04-26":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-04-27":{"linhas_atendidas_d009":87,"linhas_atendidas_d016":3,"estornos_d009":2,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":58,"inventario_rotativo_d016":5,"intercompany":0},"2026-04-28":{"linhas_atendidas_d009":64,"linhas_atendidas_d016":0,"estornos_d009":1,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":55,"inventario_rotativo_d016":0,"intercompany":1},"2026-04-29":{"linhas_atendidas_d009":87,"linhas_atendidas_d016":0,"estornos_d009":11,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":78,"inventario_rotativo_d016":0,"intercompany":2},"2026-04-30":{"linhas_atendidas_d009":61,"linhas_atendidas_d016":0,"estornos_d009":2,"estornos_d016":0,"recebimentos_d009":4,"recebimentos_d016":0,"inventario_rotativo_d009":51,"inventario_rotativo_d016":0,"intercompany":0},"2026-05-01":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-05-02":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-05-03":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-05-04":{"linhas_atendidas_d009":44,"linhas_atendidas_d016":0,"estornos_d009":1,"estornos_d016":0,"recebimentos_d009":19,"recebimentos_d016":1,"inventario_rotativo_d009":64,"inventario_rotativo_d016":1,"intercompany":0},"2026-05-05":{"linhas_atendidas_d009":82,"linhas_atendidas_d016":6,"estornos_d009":32,"estornos_d016":6,"recebimentos_d009":7,"recebimentos_d016":0,"inventario_rotativo_d009":57,"inventario_rotativo_d016":6,"intercompany":0},"2026-05-06":{"linhas_atendidas_d009":35,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":2,"recebimentos_d016":1,"inventario_rotativo_d009":27,"inventario_rotativo_d016":1,"intercompany":0},"2026-05-07":{"linhas_atendidas_d009":103,"linhas_atendidas_d016":1,"estornos_d009":2,"estornos_d016":0,"recebimentos_d009":51,"recebimentos_d016":1,"inventario_rotativo_d009":131,"inventario_rotativo_d016":1,"intercompany":1},"2026-05-08":{"linhas_atendidas_d009":50,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":11,"recebimentos_d016":0,"inventario_rotativo_d009":57,"inventario_rotativo_d016":0,"intercompany":1},"2026-05-09":{"linhas_atendidas_d009":1,"linhas_atendidas_d016":0,"estornos_d009":1,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":1,"inventario_rotativo_d016":0,"intercompany":1},"2026-05-10":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-05-11":{"linhas_atendidas_d009":66,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":3,"recebimentos_d016":0,"inventario_rotativo_d009":80,"inventario_rotativo_d016":0,"intercompany":0},"2026-05-12":{"linhas_atendidas_d009":59,"linhas_atendidas_d016":0,"estornos_d009":4,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":51,"inventario_rotativo_d016":0,"intercompany":0},"2026-05-13":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-05-14":{"linhas_atendidas_d009":36,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":3,"recebimentos_d016":0,"inventario_rotativo_d009":36,"inventario_rotativo_d016":0,"intercompany":0},"2026-05-15":{"linhas_atendidas_d009":205,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":1,"recebimentos_d016":0,"inventario_rotativo_d009":76,"inventario_rotativo_d016":0,"intercompany":1},"2026-05-16":{"linhas_atendidas_d009":12,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":12,"inventario_rotativo_d016":0,"intercompany":0},"2026-05-17":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-05-18":{"linhas_atendidas_d009":89,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":17,"recebimentos_d016":0,"inventario_rotativo_d009":69,"inventario_rotativo_d016":0,"intercompany":1},"2026-05-19":{"linhas_atendidas_d009":303,"linhas_atendidas_d016":0,"estornos_d009":1,"estornos_d016":0,"recebimentos_d009":15,"recebimentos_d016":0,"inventario_rotativo_d009":108,"inventario_rotativo_d016":0,"intercompany":1},"2026-05-20":{"linhas_atendidas_d009":76,"linhas_atendidas_d016":7,"estornos_d009":5,"estornos_d016":0,"recebimentos_d009":2,"recebimentos_d016":0,"inventario_rotativo_d009":64,"inventario_rotativo_d016":7,"intercompany":0},"2026-05-21":{"linhas_atendidas_d009":58,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":1,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":44,"inventario_rotativo_d016":1,"intercompany":0},"2026-05-22":{"linhas_atendidas_d009":34,"linhas_atendidas_d016":0,"estornos_d009":9,"estornos_d016":0,"recebimentos_d009":14,"recebimentos_d016":0,"inventario_rotativo_d009":51,"inventario_rotativo_d016":0,"intercompany":0},"2026-05-23":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-05-24":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-05-25":{"linhas_atendidas_d009":44,"linhas_atendidas_d016":0,"estornos_d009":4,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":41,"inventario_rotativo_d016":0,"intercompany":0},"2026-05-26":{"linhas_atendidas_d009":69,"linhas_atendidas_d016":0,"estornos_d009":1,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":60,"inventario_rotativo_d016":0,"intercompany":1},"2026-05-27":{"linhas_atendidas_d009":176,"linhas_atendidas_d016":0,"estornos_d009":1,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":63,"inventario_rotativo_d016":0,"intercompany":0},"2026-05-28":{"linhas_atendidas_d009":86,"linhas_atendidas_d016":0,"estornos_d009":4,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":57,"inventario_rotativo_d016":0,"intercompany":2},"2026-05-29":{"linhas_atendidas_d009":287,"linhas_atendidas_d016":0,"estornos_d009":1,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":299,"inventario_rotativo_d016":0,"intercompany":1},"2026-05-30":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-05-31":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-06-01":{"linhas_atendidas_d009":43,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":1,"recebimentos_d016":1,"inventario_rotativo_d009":74,"inventario_rotativo_d016":2,"intercompany":0},"2026-06-02":{"linhas_atendidas_d009":60,"linhas_atendidas_d016":0,"estornos_d009":1,"estornos_d016":0,"recebimentos_d009":30,"recebimentos_d016":1,"inventario_rotativo_d009":95,"inventario_rotativo_d016":1,"intercompany":0},"2026-06-03":{"linhas_atendidas_d009":126,"linhas_atendidas_d016":0,"estornos_d009":2,"estornos_d016":0,"recebimentos_d009":26,"recebimentos_d016":1,"inventario_rotativo_d009":131,"inventario_rotativo_d016":1,"intercompany":1},"2026-06-04":{"linhas_atendidas_d009":19,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":44,"recebimentos_d016":4,"inventario_rotativo_d009":75,"inventario_rotativo_d016":6,"intercompany":0},"2026-06-05":{"linhas_atendidas_d009":289,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":86,"inventario_rotativo_d016":4,"intercompany":0},"2026-06-06":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-06-07":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-06-08":{"linhas_atendidas_d009":46,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":41,"inventario_rotativo_d016":0,"intercompany":0},"2026-06-09":{"linhas_atendidas_d009":36,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":30,"inventario_rotativo_d016":0,"intercompany":0},"2026-06-10":{"linhas_atendidas_d009":66,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":2,"recebimentos_d016":0,"inventario_rotativo_d009":54,"inventario_rotativo_d016":0,"intercompany":2},"2026-06-11":{"linhas_atendidas_d009":227,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":15,"recebimentos_d016":0,"inventario_rotativo_d009":77,"inventario_rotativo_d016":0,"intercompany":0},"2026-06-12":{"linhas_atendidas_d009":98,"linhas_atendidas_d016":0,"estornos_d009":1,"estornos_d016":0,"recebimentos_d009":30,"recebimentos_d016":1,"inventario_rotativo_d009":111,"inventario_rotativo_d016":1,"intercompany":0},"2026-06-13":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-06-14":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-06-15":{"linhas_atendidas_d009":47,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":1,"recebimentos_d016":0,"inventario_rotativo_d009":42,"inventario_rotativo_d016":0,"intercompany":1},"2026-06-16":{"linhas_atendidas_d009":52,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":1,"recebimentos_d016":0,"inventario_rotativo_d009":47,"inventario_rotativo_d016":0,"intercompany":0},"2026-06-17":{"linhas_atendidas_d009":60,"linhas_atendidas_d016":0,"estornos_d009":2,"estornos_d016":0,"recebimentos_d009":8,"recebimentos_d016":0,"inventario_rotativo_d009":64,"inventario_rotativo_d016":2,"intercompany":1},"2026-06-18":{"linhas_atendidas_d009":249,"linhas_atendidas_d016":6,"estornos_d009":2,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":238,"inventario_rotativo_d016":6,"intercompany":5},"2026-06-19":{"linhas_atendidas_d009":292,"linhas_atendidas_d016":0,"estornos_d009":276,"estornos_d016":0,"recebimentos_d009":17,"recebimentos_d016":0,"inventario_rotativo_d009":172,"inventario_rotativo_d016":0,"intercompany":2},"2026-06-20":{"linhas_atendidas_d009":2,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":2,"inventario_rotativo_d016":0,"intercompany":0},"2026-06-21":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-06-22":{"linhas_atendidas_d009":58,"linhas_atendidas_d016":0,"estornos_d009":2,"estornos_d016":0,"recebimentos_d009":19,"recebimentos_d016":0,"inventario_rotativo_d009":88,"inventario_rotativo_d016":15,"intercompany":0},"2026-06-23":{"linhas_atendidas_d009":47,"linhas_atendidas_d016":0,"estornos_d009":9,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":34,"inventario_rotativo_d016":0,"intercompany":1},"2026-06-24":{"linhas_atendidas_d009":68,"linhas_atendidas_d016":0,"estornos_d009":2,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":56,"inventario_rotativo_d016":0,"intercompany":0},"2026-06-25":{"linhas_atendidas_d009":59,"linhas_atendidas_d016":0,"estornos_d009":1,"estornos_d016":0,"recebimentos_d009":1,"recebimentos_d016":0,"inventario_rotativo_d009":51,"inventario_rotativo_d016":0,"intercompany":1},"2026-06-26":{"linhas_atendidas_d009":35,"linhas_atendidas_d016":0,"estornos_d009":1,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":33,"inventario_rotativo_d016":0,"intercompany":0},"2026-06-27":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-06-28":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-06-29":{"linhas_atendidas_d009":43,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":35,"inventario_rotativo_d016":0,"intercompany":0},"2026-06-30":{"linhas_atendidas_d009":41,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":37,"inventario_rotativo_d016":0,"intercompany":0},"2026-07-01":{"linhas_atendidas_d009":65,"linhas_atendidas_d016":0,"estornos_d009":1,"estornos_d016":0,"recebimentos_d009":21,"recebimentos_d016":0,"inventario_rotativo_d009":82,"inventario_rotativo_d016":0,"intercompany":0},"2026-07-02":{"linhas_atendidas_d009":94,"linhas_atendidas_d016":0,"estornos_d009":1,"estornos_d016":0,"recebimentos_d009":61,"recebimentos_d016":0,"inventario_rotativo_d009":122,"inventario_rotativo_d016":0,"intercompany":0},"2026-07-03":{"linhas_atendidas_d009":55,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":16,"recebimentos_d016":0,"inventario_rotativo_d009":81,"inventario_rotativo_d016":9,"intercompany":0},"2026-07-04":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-07-05":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-07-06":{"linhas_atendidas_d009":64,"linhas_atendidas_d016":0,"estornos_d009":1,"estornos_d016":0,"recebimentos_d009":1,"recebimentos_d016":0,"inventario_rotativo_d009":61,"inventario_rotativo_d016":0,"intercompany":0},"2026-07-07":{"linhas_atendidas_d009":47,"linhas_atendidas_d016":0,"estornos_d009":1,"estornos_d016":0,"recebimentos_d009":1,"recebimentos_d016":0,"inventario_rotativo_d009":47,"inventario_rotativo_d016":0,"intercompany":0},"2026-07-08":{"linhas_atendidas_d009":137,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":7,"recebimentos_d016":0,"inventario_rotativo_d009":136,"inventario_rotativo_d016":0,"intercompany":4},"2026-07-09":{"linhas_atendidas_d009":72,"linhas_atendidas_d016":0,"estornos_d009":3,"estornos_d016":0,"recebimentos_d009":2,"recebimentos_d016":0,"inventario_rotativo_d009":67,"inventario_rotativo_d016":0,"intercompany":1},"2026-07-10":{"linhas_atendidas_d009":62,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":1,"recebimentos_d016":0,"inventario_rotativo_d009":46,"inventario_rotativo_d016":0,"intercompany":0},"2026-07-11":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-07-12":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-07-13":{"linhas_atendidas_d009":49,"linhas_atendidas_d016":0,"estornos_d009":1,"estornos_d016":0,"recebimentos_d009":1,"recebimentos_d016":0,"inventario_rotativo_d009":44,"inventario_rotativo_d016":0,"intercompany":0},"2026-07-14":{"linhas_atendidas_d009":41,"linhas_atendidas_d016":0,"estornos_d009":2,"estornos_d016":0,"recebimentos_d009":7,"recebimentos_d016":0,"inventario_rotativo_d009":47,"inventario_rotativo_d016":0,"intercompany":0},"2026-07-15":{"linhas_atendidas_d009":76,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":23,"recebimentos_d016":0,"inventario_rotativo_d009":79,"inventario_rotativo_d016":0,"intercompany":0},"2026-07-16":{"linhas_atendidas_d009":33,"linhas_atendidas_d016":0,"estornos_d009":1,"estornos_d016":0,"recebimentos_d009":26,"recebimentos_d016":0,"inventario_rotativo_d009":56,"inventario_rotativo_d016":0,"intercompany":0},"2026-07-17":{"linhas_atendidas_d009":46,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":4,"recebimentos_d016":0,"inventario_rotativo_d009":47,"inventario_rotativo_d016":0,"intercompany":0},"2026-07-18":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-07-19":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-07-20":{"linhas_atendidas_d009":35,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":29,"inventario_rotativo_d016":0,"intercompany":0},"2026-07-21":{"linhas_atendidas_d009":40,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":2,"recebimentos_d016":0,"inventario_rotativo_d009":42,"inventario_rotativo_d016":0,"intercompany":0},"2026-07-22":{"linhas_atendidas_d009":80,"linhas_atendidas_d016":0,"estornos_d009":1,"estornos_d016":0,"recebimentos_d009":19,"recebimentos_d016":2,"inventario_rotativo_d009":92,"inventario_rotativo_d016":2,"intercompany":0},"2026-07-23":{"linhas_atendidas_d009":41,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":1,"recebimentos_d016":0,"inventario_rotativo_d009":39,"inventario_rotativo_d016":0,"intercompany":0},"2026-07-24":{"linhas_atendidas_d009":21,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":1,"recebimentos_d016":0,"inventario_rotativo_d009":19,"inventario_rotativo_d016":0,"intercompany":0},"2026-07-25":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-07-26":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-07-27":{"linhas_atendidas_d009":30,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":27,"inventario_rotativo_d016":0,"intercompany":0},"2026-07-28":{"linhas_atendidas_d009":49,"linhas_atendidas_d016":0,"estornos_d009":1,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":41,"inventario_rotativo_d016":0,"intercompany":1},"2026-07-29":{"linhas_atendidas_d009":53,"linhas_atendidas_d016":2,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":48,"inventario_rotativo_d016":2,"intercompany":0},"2026-07-30":{"linhas_atendidas_d009":36,"linhas_atendidas_d016":0,"estornos_d009":1,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":35,"inventario_rotativo_d016":0,"intercompany":1},"2026-07-31":{"linhas_atendidas_d009":60,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":47,"inventario_rotativo_d016":0,"intercompany":0},"2026-08-01":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-08-02":{"linhas_atendidas_d009":0,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":0,"inventario_rotativo_d016":0,"intercompany":0},"2026-08-03":{"linhas_atendidas_d009":82,"linhas_atendidas_d016":18,"estornos_d009":2,"estornos_d016":0,"recebimentos_d009":41,"recebimentos_d016":0,"inventario_rotativo_d009":93,"inventario_rotativo_d016":9,"intercompany":0},"2026-08-04":{"linhas_atendidas_d009":72,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":3,"recebimentos_d016":0,"inventario_rotativo_d009":75,"inventario_rotativo_d016":1,"intercompany":0},"2026-08-05":{"linhas_atendidas_d009":140,"linhas_atendidas_d016":0,"estornos_d009":1,"estornos_d016":0,"recebimentos_d009":14,"recebimentos_d016":0,"inventario_rotativo_d009":113,"inventario_rotativo_d016":0,"intercompany":0},"2026-08-06":{"linhas_atendidas_d009":65,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":35,"recebimentos_d016":1,"inventario_rotativo_d009":91,"inventario_rotativo_d016":4,"intercompany":0},"2026-08-07":{"linhas_atendidas_d009":90,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":2,"recebimentos_d016":0,"inventario_rotativo_d009":67,"inventario_rotativo_d016":0,"intercompany":0},"2026-08-08":{"linhas_atendidas_d009":2,"linhas_atendidas_d016":0,"estornos_d009":0,"estornos_d016":0,"recebimentos_d009":0,"recebimentos_d016":0,"inventario_rotativo_d009":2,"inventario_rotativo_d016":0,"intercompany":0}};
+
+/* Histórico dos 6 indicadores manuais (planilha preenchida célula a célula pelo usuário — não
+   calculado por script nenhum, ver backend/historico_manuais.py) — 01/04/2026 a 09/08/2026.
+   'notas_aguardando_lancamento' é o card nº11 (renomeado de "Contagem Pendentes" pro nome real
+   do indicador). A partir de 10/08/2026 este indicador passa a ser alimentado dia a dia, fora
+   do escopo deste arquivo estático — reexportar: rodar
+   `python -m backend.historico_manuais --entrada "<planilha.xlsx>"` e colar o conteúdo do
+   historico_manuais.json aqui (mesmo formato: {'aaaa-mm-dd': {6 campos}, ...}). */
+const HISTORICO_MANUAL = {"2026-04-01":{"notas_aguardando_lancamento":30,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":17,"pendencias_atendimento_linhas":29},"2026-04-02":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":15,"pendencias_atendimento_linhas":25},"2026-04-03":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":11,"pendencias_atendimento_linhas":19},"2026-04-04":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-04-05":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-04-06":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":15,"pendencias_atendimento_linhas":24},"2026-04-07":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":10,"pendencias_atendimento_linhas":16},"2026-04-08":{"notas_aguardando_lancamento":25,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":6,"pendencias_atendimento_linhas":14},"2026-04-09":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":4,"pendencias_atendimento_linhas":22},"2026-04-10":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":8,"pendencias_atendimento_linhas":14},"2026-04-11":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-04-12":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-04-13":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":11,"pendencias_atendimento_linhas":12},"2026-04-14":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":16,"pendencias_atendimento_linhas":17},"2026-04-15":{"notas_aguardando_lancamento":20,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":14,"pendencias_atendimento_linhas":23},"2026-04-16":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":18,"pendencias_atendimento_linhas":23},"2026-04-17":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":13,"pendencias_atendimento_linhas":20},"2026-04-18":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-04-19":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-04-20":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":14,"pendencias_atendimento_linhas":22},"2026-04-21":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":13,"pendencias_atendimento_linhas":18},"2026-04-22":{"notas_aguardando_lancamento":15,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":11,"pendencias_atendimento_linhas":20},"2026-04-23":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":7,"pendencias_atendimento_linhas":14},"2026-04-24":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":8,"pendencias_atendimento_linhas":9},"2026-04-25":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-04-26":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-04-27":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":8,"pendencias_atendimento_linhas":12},"2026-04-28":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":12,"pendencias_atendimento_linhas":12},"2026-04-29":{"notas_aguardando_lancamento":10,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":7,"pendencias_atendimento_linhas":18},"2026-04-30":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":10,"pendencias_atendimento_linhas":13},"2026-05-01":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":11,"pendencias_atendimento_linhas":19},"2026-05-02":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-05-03":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-05-04":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":10,"pendencias_atendimento_linhas":22},"2026-05-05":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":14,"pendencias_atendimento_linhas":20},"2026-05-06":{"notas_aguardando_lancamento":22,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":10,"pendencias_atendimento_linhas":13},"2026-05-07":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":15,"pendencias_atendimento_linhas":19},"2026-05-08":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":11,"pendencias_atendimento_linhas":18},"2026-05-09":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-05-10":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-05-11":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":7,"pendencias_atendimento_linhas":22},"2026-05-12":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":6,"pendencias_atendimento_linhas":28},"2026-05-13":{"notas_aguardando_lancamento":17,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":11,"pendencias_atendimento_linhas":31},"2026-05-14":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":8,"pendencias_atendimento_linhas":34},"2026-05-15":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":8,"pendencias_atendimento_linhas":32},"2026-05-16":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-05-17":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-05-18":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":13,"pendencias_atendimento_linhas":32},"2026-05-19":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":18,"pendencias_atendimento_linhas":26},"2026-05-20":{"notas_aguardando_lancamento":12,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":22,"pendencias_atendimento_linhas":23},"2026-05-21":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":25,"pendencias_atendimento_linhas":27},"2026-05-22":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":27,"pendencias_atendimento_linhas":31},"2026-05-23":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-05-24":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-05-25":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":26,"pendencias_atendimento_linhas":30},"2026-05-26":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":31,"pendencias_atendimento_linhas":32},"2026-05-27":{"notas_aguardando_lancamento":8,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":26,"pendencias_atendimento_linhas":31},"2026-05-28":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":21,"pendencias_atendimento_linhas":33},"2026-05-29":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":22,"pendencias_atendimento_linhas":33},"2026-05-30":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-05-31":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-06-01":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":18,"pendencias_atendimento_linhas":31},"2026-06-02":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":22,"pendencias_atendimento_linhas":33},"2026-06-03":{"notas_aguardando_lancamento":28,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":20,"pendencias_atendimento_linhas":40},"2026-06-04":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":21,"pendencias_atendimento_linhas":46},"2026-06-05":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":18,"pendencias_atendimento_linhas":46},"2026-06-06":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-06-07":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-06-08":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":15,"pendencias_atendimento_linhas":45},"2026-06-09":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":18,"pendencias_atendimento_linhas":45},"2026-06-10":{"notas_aguardando_lancamento":20,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":22,"pendencias_atendimento_linhas":50},"2026-06-11":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":26,"pendencias_atendimento_linhas":54},"2026-06-12":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":26,"pendencias_atendimento_linhas":53},"2026-06-13":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-06-14":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-06-15":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":23,"pendencias_atendimento_linhas":61},"2026-06-16":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":25,"pendencias_atendimento_linhas":55},"2026-06-17":{"notas_aguardando_lancamento":18,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":20,"pendencias_atendimento_linhas":50},"2026-06-18":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":17,"pendencias_atendimento_linhas":47},"2026-06-19":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":22,"pendencias_atendimento_linhas":52},"2026-06-20":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-06-21":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-06-22":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":26,"pendencias_atendimento_linhas":46},"2026-06-23":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":27,"pendencias_atendimento_linhas":50},"2026-06-24":{"notas_aguardando_lancamento":12,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":31,"pendencias_atendimento_linhas":56},"2026-06-25":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":34,"pendencias_atendimento_linhas":56},"2026-06-26":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":37,"pendencias_atendimento_linhas":48},"2026-06-27":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-06-28":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-06-29":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":40,"pendencias_atendimento_linhas":43},"2026-06-30":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":40,"pendencias_atendimento_linhas":43},"2026-07-01":{"notas_aguardando_lancamento":37,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":17,"reservas_pendentes":30,"pendencias_atendimento_linhas":31},"2026-07-02":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":17,"reservas_pendentes":29,"pendencias_atendimento_linhas":30},"2026-07-03":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":17,"reservas_pendentes":35,"pendencias_atendimento_linhas":46},"2026-07-04":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-07-05":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-07-06":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":17,"reservas_pendentes":32,"pendencias_atendimento_linhas":33},"2026-07-07":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":17,"reservas_pendentes":26,"pendencias_atendimento_linhas":34},"2026-07-08":{"notas_aguardando_lancamento":25,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":12,"reservas_pendentes":27,"pendencias_atendimento_linhas":36},"2026-07-09":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":12,"reservas_pendentes":27,"pendencias_atendimento_linhas":36},"2026-07-10":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":12,"reservas_pendentes":33,"pendencias_atendimento_linhas":41},"2026-07-11":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-07-12":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-07-13":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":12,"reservas_pendentes":29,"pendencias_atendimento_linhas":38},"2026-07-14":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":12,"reservas_pendentes":25,"pendencias_atendimento_linhas":34},"2026-07-15":{"notas_aguardando_lancamento":25,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":12,"reservas_pendentes":28,"pendencias_atendimento_linhas":37},"2026-07-16":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":12,"reservas_pendentes":26,"pendencias_atendimento_linhas":63},"2026-07-17":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":10,"reservas_pendentes":28,"pendencias_atendimento_linhas":39},"2026-07-18":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-07-19":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-07-20":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":12,"reservas_pendentes":27,"pendencias_atendimento_linhas":37},"2026-07-21":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":12,"reservas_pendentes":27,"pendencias_atendimento_linhas":40},"2026-07-22":{"notas_aguardando_lancamento":17,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":12,"reservas_pendentes":26,"pendencias_atendimento_linhas":37},"2026-07-23":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":6,"reservas_pendentes":30,"pendencias_atendimento_linhas":42},"2026-07-24":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":6,"reservas_pendentes":23,"pendencias_atendimento_linhas":32},"2026-07-25":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-07-26":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-07-27":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":6,"reservas_pendentes":23,"pendencias_atendimento_linhas":32},"2026-07-28":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":26,"pendencias_atendimento_linhas":35},"2026-07-29":{"notas_aguardando_lancamento":38,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":16,"pendencias_atendimento_linhas":31},"2026-07-30":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":18,"pendencias_atendimento_linhas":33},"2026-07-31":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":32,"pendencias_atendimento_linhas":55},"2026-08-01":{"notas_aguardando_lancamento":0,"devolucao":4,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-08-02":{"notas_aguardando_lancamento":0,"devolucao":4,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-08-03":{"notas_aguardando_lancamento":0,"devolucao":4,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":25,"pendencias_atendimento_linhas":65},"2026-08-04":{"notas_aguardando_lancamento":0,"devolucao":4,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":23,"pendencias_atendimento_linhas":39},"2026-08-05":{"notas_aguardando_lancamento":62,"devolucao":4,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":33,"pendencias_atendimento_linhas":74},"2026-08-06":{"notas_aguardando_lancamento":0,"devolucao":4,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":33,"pendencias_atendimento_linhas":78},"2026-08-07":{"notas_aguardando_lancamento":0,"devolucao":4,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":32,"pendencias_atendimento_linhas":78},"2026-08-08":{"notas_aguardando_lancamento":0,"devolucao":4,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-08-09":{"notas_aguardando_lancamento":0,"devolucao":4,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":0,"pendencias_atendimento_linhas":0}};
+
+/* mapeia o "n" do card (ver CARDS/BLOCK1/LOOSE) pro par [objeto histórico, chave dentro dele] —
+   cobre os 15 indicadores com dado real (9 da MB51 + 6 manuais); os outros 5 (ZMM028 + Curva
+   ABC) não aparecem aqui de propósito, continuam mock até ganharem fonte real. */
+const HISTORICO_POR_N = {
+  1:[HISTORICO_MB51,'linhas_atendidas_d009'],       2:[HISTORICO_MB51,'linhas_atendidas_d016'],
+  3:[HISTORICO_MB51,'recebimentos_d009'],           4:[HISTORICO_MB51,'recebimentos_d016'],
+  5:[HISTORICO_MB51,'estornos_d009'],               6:[HISTORICO_MB51,'estornos_d016'],
+  7:[HISTORICO_MB51,'inventario_rotativo_d009'],    8:[HISTORICO_MB51,'inventario_rotativo_d016'],
+  9:[HISTORICO_MANUAL,'pendencias_atendimento_linhas'],
+  10:[HISTORICO_MANUAL,'reservas_pendentes'],
+  11:[HISTORICO_MANUAL,'notas_aguardando_lancamento'],
+  12:[HISTORICO_MANUAL,'nf_pendente_faturamento'],
+  13:[HISTORICO_MANUAL,'devolucao'],
+  19:[HISTORICO_MB51,'intercompany'],
+  20:[HISTORICO_MANUAL,'scanner_documentos'],
+};
+
+/* safra 2026/2027 — único intervalo navegável por enquanto; expandir safra é fase futura */
+const SEASON_START = new Date(2026, 3, 1);   // 01/04/2026
+const SEASON_END   = new Date(2027, 2, 31);  // 31/03/2027
+
+function dateOnly(d){ const x = new Date(d); x.setHours(0,0,0,0); return x; }
+function sameDay(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+function isWithinSeason(d){ return d >= SEASON_START && d <= SEASON_END; }
+/* "hoje" nunca é lido de uma constante — sempre recalculado no momento do render, pra a trava
+   de data futura acompanhar o relógio real do sistema sozinha, sem precisar de deploy novo */
+function today(){ return dateOnly(new Date()); }
+
+/* PRNG determinístico (mulberry32) — mesma data sempre gera o mesmo mock, pra reabrir o mesmo
+   dia não ficar trocando os números à toa. Etapa futura troca isto por leitura do histórico
+   real por data. */
+function seededRandom(seed){
+  let t = seed + 0x6D2B79F5;
+  return function(){
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function hashStr(s){ let h = 0; for(let i=0; i<s.length; i++) h = (h*31 + s.charCodeAt(i)) | 0; return h; }
+
+/* dias úteis: sábado/domingo entram aqui; feriados também deveriam, mas NENHUMA lista de
+   feriados existe no projeto ainda (nem aqui, nem no backend) — HOLIDAYS fica vazio de
+   propósito, é só o gancho pronto pra quando essa fonte de dado for definida. Até lá, a regra
+   de fim de semana/feriado só tem efeito prático em sábado e domingo. */
+const HOLIDAYS = new Set([]); // ISO 'aaaa-mm-dd' — vazio até existir uma lista real de feriados
+
+function isWeekend(d){ const wd = d.getDay(); return wd===0 || wd===6; }
+function isHoliday(d){ return HOLIDAYS.has(dateOnly(d).toISOString().slice(0,10)); }
+function isBusinessDay(d){ return !isWeekend(d) && !isHoliday(d); }
+
+/* pula fim de semana/feriado voltando dia a dia — é assim que segunda (ou o 1º dia útil depois
+   de um feriado) compara com sexta (ou o último dia útil anterior), nunca com sábado/domingo */
+function previousBusinessDay(d){
+  const x = new Date(d);
+  do { x.setDate(x.getDate()-1); } while(!isBusinessDay(x));
+  return dateOnly(x);
+}
+
+/* dia útil sempre "teve movimentação" (premissa razoável — é dia normal de operação). Fim de
+   semana/feriado é exceção: dentro do intervalo com dado real (HISTORICO_MB51), a resposta é a
+   verdade — teve movimentação se qualquer um dos 9 indicadores da MB51 for > 0 naquele dia; sem
+   dado real pra essa data, cai pro mock determinístico por data (~30% dos fins de semana "têm"
+   movimentação, só pra dar exemplo dos dois casos ao testar). Checar o real aqui evita bloquear
+   no calendário um sábado que o histórico já sabe que teve movimento (ou o contrário). */
+function hasMovement(d){
+  if(isBusinessDay(d)) return true;
+  const iso = dateOnly(d).toISOString().slice(0,10);
+  const diaReal = HISTORICO_MB51[iso];
+  if(diaReal) return Object.values(diaReal).some(v => v > 0);
+  const rand = seededRandom(hashStr('movimentacao-'+iso));
+  return rand() < 0.3;
+}
+
+/* valores "crus" (sem lógica de comparação) pra uma data — só usado como MOCK, quando não há
+   dado real (indicador fora dos 9 da MB51, ou data fora de 01/04/2026–08/08/2026). */
+function rawValuesForDate(d){
+  const rand = seededRandom(hashStr(dateOnly(d).toISOString().slice(0,10)));
+  return CARDS.map(base => ({
+    n: base.n,
+    value: Math.round(rand()*100),
+    spark: Array.from({length:8}, () => Math.round(rand()*30)),
+  }));
+}
+
+/* linha de tendência real pros indicadores com histórico (MB51 ou manual): os 8 dias corridos
+   terminando na data selecionada (inclusive), puxados direto do objeto histórico passado — dia
+   fora do intervalo coberto conta como 0 (só acontece pra datas bem no início da safra, perto
+   de 01/04/2026). */
+function realSparklineValues(dOnly, historico, chave){
+  const pts = [];
+  for(let i=7; i>=0; i--){
+    const dt = new Date(dOnly); dt.setDate(dt.getDate()-i);
+    const diaReal = historico[dateOnly(dt).toISOString().slice(0,10)];
+    pts.push(diaReal ? diaReal[chave] : 0);
+  }
+  return pts;
+}
+
+/* dashboard do dia selecionado — os 20 indicadores completos, mesma estrutura do Início.
+   Reaproveita title/icon/color/n originais de CARDS (Início). Pros 15 indicadores com histórico
+   (ver HISTORICO_POR_N: 9 da MB51 + 6 manuais), usa dado REAL quando a data cai dentro do
+   intervalo coberto por aquela fonte; fora disso, ou pros outros 5 indicadores (ZMM028 + Curva
+   ABC, ainda sem fonte real), cai pro mock de sempre. Regras de fim de semana/feriado (aplicam
+   nos dois casos):
+   - segunda (ou 1º dia útil após o intervalo) compara sempre com sexta (ou último dia útil
+     anterior) — nunca com sábado/domingo — via previousBusinessDay();
+   - num fim de semana/feriado COM movimentação excepcional: os indicadores com histórico
+     mostram o valor daquele dia; os sem histórico repetem o valor do último dia útil anterior,
+     porque essas fontes não têm leitura própria nesse dia; nenhum dos 20 mostra comparação/seta
+     nesse dia (ver noCompare em cardHtml). */
+function mockCardsForDate(d){
+  const dOnly = dateOnly(d);
+  const iso = dOnly.toISOString().slice(0,10);
+  const exceptional = !isBusinessDay(dOnly) && hasMovement(dOnly);
+  const todayRaw = rawValuesForDate(dOnly);
+  const prevDate = previousBusinessDay(dOnly);
+  const prevIso = prevDate.toISOString().slice(0,10);
+  const prevRaw = rawValuesForDate(prevDate);
+
+  return CARDS.map((base, i) => {
+    const entry = HISTORICO_POR_N[base.n]; // [objetoHistorico, chave] ou undefined
+    const [historico, chaveReal] = entry || [];
+    const diaReal = historico ? historico[iso] : undefined;
+
+    if(diaReal){
+      const value = diaReal[chaveReal];
+      const spark = realSparklineValues(dOnly, historico, chaveReal);
+      const diaAnteriorReal = historico[prevIso];
+      if(exceptional || !diaAnteriorReal){
+        // fim de semana excepcional, ou "ontem" cai fora do intervalo coberto (bem no início
+        // da safra) — mostra o valor real de hoje, sem comparação inventada
+        return {...base, value:String(value), yesterday:'', dir:'flat', deltaPct:0, spark, noCompare:true};
+      }
+      const yesterday = diaAnteriorReal[chaveReal];
+      const dir = value>yesterday ? 'up' : value<yesterday ? 'down' : 'flat';
+      const deltaPct = yesterday===0 ? (value===0?0:100) : +(((value-yesterday)/yesterday)*100).toFixed(1);
+      return {...base, value:String(value), yesterday:String(yesterday), dir, deltaPct, spark};
+    }
+
+    const temFonteReal = !!entry; // MB51 ou manual — qualquer indicador com histórico, mesmo fora do intervalo coberto agora
+    let value, spark, yesterday, dir, deltaPct;
+    if(exceptional){
+      const src = temFonteReal ? todayRaw[i] : prevRaw[i];
+      value = src.value; spark = src.spark;
+      yesterday = null; dir = 'flat'; deltaPct = 0;
+    } else {
+      value = todayRaw[i].value; spark = todayRaw[i].spark;
+      yesterday = prevRaw[i].value;
+      dir = value>yesterday ? 'up' : value<yesterday ? 'down' : 'flat';
+      deltaPct = yesterday===0 ? (value===0?0:100) : +(((value-yesterday)/yesterday)*100).toFixed(1);
+    }
+    return {...base, value:String(value), yesterday: yesterday==null ? '' : String(yesterday), dir, deltaPct, spark, noCompare:exceptional};
+  });
+}
+
+/* se hoje for um fim de semana/feriado sem movimentação, abrir a tela já num dia bloqueado
+   seria inconsistente com o que o próprio calendário mostra visualmente — cai pro dia útil
+   disponível mais recente. Precisa vir DEPOIS de hasMovement()/HOLIDAYS/seededRandom acima
+   (mesmo sendo tudo function/const hoisted, o valor de HOLIDAYS só existe depois que a linha
+   `const HOLIDAYS = ...` roda — chamar isso mais cedo no arquivo é o bug que já quebrou a
+   página inteira uma vez: ReferenceError na TDZ do const, sem try/catch, para o script todo). */
+function mostRecentAvailableDate(from){
+  let d = dateOnly(from);
+  while(!hasMovement(d)){ d = new Date(d); d.setDate(d.getDate()-1); d = dateOnly(d); }
+  return d;
+}
+
+let calViewDate = dateOnly(new Date());                     // mês/ano exibido na grade do dropdown
+let calSelectedDate = mostRecentAvailableDate(new Date());  // dia mostrado no dashboard — padrão: hoje (ou o último dia com movimentação, se hoje não tiver)
+let calOpen = false;                                         // dropdown começa fechado: a tela abre já no dashboard
+
+/* painéis laterais do dia selecionado — mesmo padrão visual do Início, conteúdo mock que muda
+   por data (seed própria, separada da dos cards, pra não repetir os mesmos números "por
+   coincidência"). "Recebimento do Dia" fica de fora dessa lista de propósito: sua fonte de dado
+   ainda não foi definida nem no Início, então mostra sempre o mesmo estado vazio — não é mock
+   por falta de tempo, é porque não existe dado nenhum, real ou fictício, pra mostrar ali ainda. */
+const ATTENTION_POOL = [
+  'Reservas vencidas há mais de 5 dias precisam de revisão',
+  'Contagens de inventário rotativo atrasadas',
+  'Itens sem giro há mais de 180 dias identificados',
+  'Divergências de saldo em aberto no ZMM028',
+  'Transferências entre depósitos pendentes de confirmação',
+  'Pendências de atendimento de linhas acima da média',
+  'Devoluções aguardando conferência',
+];
+const NOTICE_POOL = [
+  'Inventário Safra 23/24 — início previsto em 01/04/2026',
+  'Pré-organização do Inventário Geral prevista para dezembro/2026',
+  'Fechamento mensal agendado para 07/07/2026',
+  'Auditoria interna prevista para o mês corrente',
+  'Atualização de layout SAP prevista pra próxima semana',
+];
+const VACATION_POOL = ['João Silva','Maria Santos','Carlos Lima','Ana Costa','Pedro Alves','Fernanda Rocha'];
+
+/* embaralha pool com o PRNG seedado e pega um subconjunto de tamanho entre min e max */
+function pickSubset(pool, rand, min, max){
+  const n = min + Math.floor(rand()*(max-min+1));
+  const idx = pool.map((_,i)=>i);
+  for(let i=idx.length-1; i>0; i--){
+    const j = Math.floor(rand()*(i+1));
+    [idx[i], idx[j]] = [idx[j], idx[i]];
+  }
+  return idx.slice(0, n).map(i => pool[i]);
+}
+
+function mockVacationsForDate(d, rand){
+  const names = pickSubset(VACATION_POOL, rand, 0, 2);
+  return names.map(name => {
+    const startOffset = -3 - Math.floor(rand()*7);
+    const duration = 6 + Math.floor(rand()*8);
+    const start = new Date(d); start.setDate(start.getDate()+startOffset);
+    const end = new Date(start); end.setDate(end.getDate()+duration);
+    const fmt = x => x.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
+    return {name, period:`${fmt(start)} a ${fmt(end)}`};
+  });
+}
+
+function renderCalPanels(d){
+  const rand = seededRandom(hashStr('painéis-'+dateOnly(d).toISOString().slice(0,10)));
+  const attention = pickSubset(ATTENTION_POOL, rand, 2, 4);
+  const notices = pickSubset(NOTICE_POOL, rand, 1, 3);
+  const vacations = mockVacationsForDate(d, rand);
+
+  document.getElementById('calAttentionList').innerHTML = attention.map(t => `<li>${t}</li>`).join('');
+  document.getElementById('calNoticeList').innerHTML = notices.map(t => `<li>${t}</li>`).join('');
+
+  document.getElementById('calVacationList').innerHTML = vacations.length
+    ? vacations.map(v => `<div class="vacation-row"><span class="name">${v.name}</span><span class="period">${v.period}</span></div>`).join('')
+    : `<div class="panel-empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c.6-3.6 3.3-6 6.5-6s5.9 2.4 6.5 6"/><circle cx="18" cy="8" r="2.6"/><path d="M16 14.2c2.6.4 4.6 2.6 5 5.8"/></svg>
+        Ninguém de férias/ausente neste período
+      </div>`;
+
+  requestAnimationFrame(fitPanels); // conteúdo novo pode precisar de um scale diferente pra caber
+}
+
+function setCalOpen(open){
+  calOpen = open;
+  document.getElementById('screen-calendario').classList.toggle('cal-open', open);
+}
+
+function renderCalPicker(){
+  const t = today();
+  const y = calViewDate.getFullYear(), m = calViewDate.getMonth();
+  document.getElementById('calMonthLabel').textContent = `${MONTH_NAMES[m]} ${y}`;
+
+  /* navegação trava exatamente na borda da safra — não dá pra sair de abril/2026–março/2027 */
+  document.getElementById('calPrevBtn').disabled = new Date(y, m, 0) < SEASON_START;
+  document.getElementById('calNextBtn').disabled = new Date(y, m+1, 1) > SEASON_END;
+
+  const firstOfMonth = new Date(y, m, 1);
+  const startWeekday = firstOfMonth.getDay();
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+
+  const cells = [];
+  for(let i=startWeekday; i>0; i--) cells.push({date:new Date(y, m, 1-i), inMonth:false});
+  for(let day=1; day<=daysInMonth; day++) cells.push({date:new Date(y, m, day), inMonth:true});
+  let next = 1;
+  while(cells.length < 42) cells.push({date:new Date(y, m+1, next++), inMonth:false});
+
+  document.getElementById('calGrid').innerHTML = cells.map(({date, inMonth}) => {
+    /* fim de semana/feriado sem nenhuma movimentação registrada bloqueia igual data futura —
+       mesmo tratamento visual, ver hasMovement() */
+    const blocked = !inMonth || !isWithinSeason(date) || date > t || !hasMovement(date);
+    const cls = ['cal-day'];
+    if(!inMonth) cls.push('cal-day-out');
+    else if(blocked) cls.push('cal-day-blocked');
+    if(inMonth && sameDay(date, t)) cls.push('cal-day-today');
+    if(inMonth && sameDay(date, calSelectedDate)) cls.push('cal-day-selected');
+    const iso = date.toISOString().slice(0,10);
+    return `<button type="button" class="${cls.join(' ')}" data-date="${iso}" ${blocked?'disabled':''}>${date.getDate()}</button>`;
+  }).join('');
+}
+
+function renderCalDashboard(){
+  document.getElementById('calBarDateLabel').textContent =
+    calSelectedDate.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric'});
+  document.getElementById('calCardGrid').innerHTML = mockCardsForDate(calSelectedDate).map(cardHtml).join('');
+  renderCalPanels(calSelectedDate);
+}
+
+document.getElementById('calToggleBtn').addEventListener('click', () => setCalOpen(!calOpen));
+/* clicar fora do popover (ou selecionar um dia — já tratado no listener do calGrid) fecha o
+   calendário, como qualquer dropdown/date-picker padrão */
+document.addEventListener('click', e => {
+  if(!calOpen) return;
+  const picker = document.getElementById('calPicker');
+  const toggle = document.getElementById('calToggleBtn');
+  if(picker.contains(e.target) || toggle.contains(e.target)) return;
+  setCalOpen(false);
+});
+document.getElementById('calPrevBtn').addEventListener('click', () => {
+  calViewDate = new Date(calViewDate.getFullYear(), calViewDate.getMonth()-1, 1);
+  renderCalPicker();
+});
+document.getElementById('calNextBtn').addEventListener('click', () => {
+  calViewDate = new Date(calViewDate.getFullYear(), calViewDate.getMonth()+1, 1);
+  renderCalPicker();
+});
+document.getElementById('calGrid').addEventListener('click', e => {
+  const btn = e.target.closest('.cal-day');
+  if(!btn || btn.disabled) return;
+  calSelectedDate = dateOnly(new Date(btn.dataset.date + 'T00:00:00'));
+  calViewDate = new Date(calSelectedDate.getFullYear(), calSelectedDate.getMonth(), 1);
+  renderCalPicker();
+  renderCalDashboard();
+  setCalOpen(false); // seleção válida fecha o dropdown na hora, sem precisar de ação extra
+});
+renderCalPicker();
+renderCalDashboard();
 
 /* encolhe a fonte de cada painel (via --panel-scale) até o conteúdo inteiro caber sem cortar —
    pensado pra TV, onde ninguém vai clicar em "ver mais": tudo fica sempre visível */
@@ -540,15 +1158,246 @@ function fitPanels(){
 requestAnimationFrame(fitPanels);
 window.addEventListener('resize', fitPanels);
 
+/* ================= Resumo do Mês — Fase 1a: dados fixos/fictícios ================= */
+function fmtInt(n){ return Math.round(n).toLocaleString('pt-BR'); }
+function fmtMoney(n){ return 'R$ ' + n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+
+/* quebra "Reservas (BWART 201)" em 2 linhas pro label do eixo X não estourar a largura da barra */
+function splitLabelLines(label){
+  const i = label.indexOf(' (');
+  return i === -1 ? [label] : [label.slice(0, i), label.slice(i+1)];
+}
+
+/* gráfico de barras genérico (usado em Ordens x Reservas e Top 5 Centro de Custo).
+   w/h vêm do tamanho real (em px) do container no DOM — ver fillChartBody() — pra o
+   viewBox bater exatamente com o espaço disponível e não sobrar borda vazia (letterbox)
+   nem texto minúsculo. */
+function barChartSvg(items, w, h, opts={}){
+  /* padding trava num teto proporcional à altura real — protege contra plotH negativo/zero
+     (testado: abaixo disso as barras somem e os rótulos dos eixos se amontoam) */
+  const padL = 34, padR = 10;
+  const padT = Math.min(26, h*0.16);
+  const padB = Math.min(opts.padB || 34, h*0.22);
+  const plotW = w - padL - padR, plotH = Math.max(h - padT - padB, 1);
+  const step = opts.step || 500;
+  const rawMax = Math.max(...items.map(i => i.value));
+  const niceMax = Math.max(step, Math.ceil(rawMax / step) * step);
+  const n = items.length;
+  const slot = plotW / n;
+  /* largura da barra é fixa em relação a uma grade de referência (5 slots — o maior dos dois
+     gráficos, Top 5), não em relação ao n daquele gráfico específico. Assim o gráfico de 2 barras
+     (Ordens x Reservas) não estica as barras pra preencher o espaço — fica com a mesma espessura
+     do gráfico de 5, só com mais vazio ao redor. */
+  const barW = (plotW / (opts.refSlots || n)) * 0.28;
+
+  let grid = '';
+  const gridSteps = 4;
+  for(let s=0; s<=gridSteps; s++){
+    const val = niceMax / gridSteps * s;
+    const y = padT + plotH - (val/niceMax)*plotH;
+    grid += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${w-padR}" y2="${y.toFixed(1)}" stroke="var(--gray-300)" stroke-width="1" stroke-dasharray="2,3"/>`;
+    grid += `<text x="${(padL-6).toFixed(1)}" y="${(y+3).toFixed(1)}" font-size="8" fill="var(--gray-500)" text-anchor="end">${fmtInt(val)}</text>`;
+  }
+
+  let bars = '', xLabels = '';
+  items.forEach((it,i) => {
+    const barH = (it.value/niceMax)*plotH;
+    const x = padL + i*slot + (slot-barW)/2;
+    const y = padT + plotH - barH;
+    bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" rx="3" fill="${COLOR_HEX[it.color]}"/>`;
+    bars += `<text x="${(x+barW/2).toFixed(1)}" y="${(y-8).toFixed(1)}" font-size="13" font-weight="800" fill="var(--gray-900)" text-anchor="middle">${fmtInt(it.value)}</text>`;
+    const lines = splitLabelLines(it.label);
+    xLabels += lines.map((line, li) =>
+      `<text x="${(x+barW/2).toFixed(1)}" y="${(h-padB+14+li*11).toFixed(1)}" font-size="9.5" font-weight="600" fill="var(--gray-500)" text-anchor="middle">${line}</text>`
+    ).join('');
+  });
+
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">${grid}${bars}${xLabels}</svg>`;
+}
+
+/* gráfico de área/linha grande (usado em SKUs Zerados por Dia) — mesma técnica de curva suave
+   da sparkline dos cards do Início, só que maior e com eixos/labels visíveis. w/h vêm do
+   tamanho real do container, mesmo motivo do barChartSvg(). */
+function bigAreaChart(points, color, w, h, opts={}){
+  const padL = 30, padR = 10;
+  const padT = Math.min(22, h*0.12);
+  const padB = Math.min(20, h*0.1);
+  const plotW = w - padL - padR, plotH = Math.max(h - padT - padB, 1);
+  const step = opts.step || 50;
+  const maxVal = opts.maxVal || Math.ceil(Math.max(...points)/step)*step;
+  const n = points.length;
+  const stepX = plotW/(n-1);
+  const pts = points.map((p,i) => [padL + i*stepX, padT + plotH - (p/maxVal)*plotH]);
+  const linePath = smoothPath(pts);
+  const areaPath = `${linePath} L${(padL+plotW).toFixed(2)},${(padT+plotH).toFixed(2)} L${padL.toFixed(2)},${(padT+plotH).toFixed(2)} Z`;
+
+  let grid = '';
+  for(let v=0; v<=maxVal; v+=step){
+    const y = padT + plotH - (v/maxVal)*plotH;
+    grid += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${padL+plotW}" y2="${y.toFixed(1)}" stroke="var(--gray-300)" stroke-width="1" stroke-dasharray="2,3"/>`;
+    grid += `<text x="${(padL-6).toFixed(1)}" y="${(y+3).toFixed(1)}" font-size="8" fill="var(--gray-500)" text-anchor="end">${v}</text>`;
+  }
+
+  const dots = pts.map(([x,y],i) =>
+    `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="2.6" fill="${color}"/>`
+    + `<text x="${x.toFixed(2)}" y="${(y-7).toFixed(2)}" font-size="9" font-weight="700" fill="var(--gray-700)" text-anchor="middle">${points[i]}</text>`
+  ).join('');
+  const xLabels = pts.map(([x],i) =>
+    `<text x="${x.toFixed(2)}" y="${h-4}" font-size="8.5" fill="var(--gray-500)" text-anchor="middle">${i+1}</text>`
+  ).join('');
+
+  const gid = 'bg'+Math.random().toString(36).slice(2,8);
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">
+    <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${color}" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+    </linearGradient></defs>
+    ${grid}
+    <path d="${areaPath}" fill="url(#${gid})" stroke="none"/>
+    <path d="${linePath}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    ${dots}${xLabels}
+  </svg>`;
+}
+
+/* dados fixos/fictícios — Fase 1a / Etapa 1. Etapa 2 troca isto pelo cálculo real
+   (MB51 filtrada pelo mês selecionado, MB25/ZMM028 snapshot do fim do mês etc.),
+   indicador por indicador. */
+const RESUMO_MES = {
+  linhasAtendidas: 1248,
+  valorTotalAtendido: 1285430.75,
+  /* rótulo visível não mostra o BWART — o cálculo por trás continua sendo 201 (Reservas) x 261 (Ordens) */
+  ordensReservas: [
+    { label: 'Reservas', value: 1587, color: 'green' },
+    { label: 'Ordens',   value: 932,  color: 'orange' },
+  ],
+  top5CentroCusto: [
+    { label: '2003-ADM', value: 2003, color: 'red' },
+    { label: '2003-PRO', value: 1456, color: 'blue' },
+    { label: '2003-MAN', value: 1102, color: 'purple' },
+    { label: '2003-LOG', value: 876,  color: 'orange' },
+    { label: '2003-CAL', value: 642,  color: 'green' },
+  ],
+  recebimento: { skus: 1132, valor: 1485650.75 },
+  inventarioRotativo: { skusUnicos: 876 },
+  estorno: { qtd: 142, valor: 85320.40 },
+  /* 31 valores — julho tem 31 dias (dia 1 a dia 31, ver bug corrigido: só havia 30 antes) */
+  skusZeradosPorDia: [
+    180,171,195,165,158,176,150,147,139,160,131,127,123,118,112,
+    109,103,98,89,84,80,76,71,67,63,59,55,53,48,42,38
+  ],
+};
+
+function renderResumoMes(){
+  document.getElementById('resumoKpis').innerHTML = `
+    <div class="kpi-box">
+      <span class="kpi-label">LINHAS ATENDIDAS NO MÊS</span>
+      <span class="kpi-value" style="color:${COLOR_HEX.red}">${fmtInt(RESUMO_MES.linhasAtendidas)}</span>
+      <span class="kpi-sub">Total de Linhas</span>
+    </div>
+    <div class="kpi-box">
+      <span class="kpi-label">VALOR TOTAL ATENDIDO (R$)</span>
+      <span class="kpi-value" style="color:${COLOR_HEX.red}">${fmtMoney(RESUMO_MES.valorTotalAtendido)}</span>
+      <span class="kpi-sub">Valor em Reais</span>
+    </div>
+  `;
+
+  document.getElementById('chartOrdensReservas').innerHTML = `
+    <div class="chart-head"><div class="icon-badge">${svg('trendUp')}</div><span class="chart-title">1. Atendimento — Ordens x Reservas</span></div>
+    <span class="chart-sub">Comparativo por quantidade</span>
+    <div class="chart-body" id="bodyOrdensReservas"></div>
+  `;
+
+  document.getElementById('chartTop5Centro').innerHTML = `
+    <div class="chart-head"><div class="icon-badge">${svg('abcBars')}</div><span class="chart-title">Top 5 — Centro de Custo que Mais Consumiu</span></div>
+    <span class="chart-sub">Ranking dos 5 principais</span>
+    <div class="chart-body" id="bodyTop5Centro"></div>
+  `;
+
+  document.getElementById('resumoStatsRow').innerHTML = `
+    <div class="stat-card c-green">
+      <div class="chart-head"><div class="icon-badge">${svg('truck')}</div><span class="chart-title">2. Recebimento</span></div>
+      <div class="stat-fields">
+        <div class="stat-field">
+          <span class="stat-field-label">QTD. SKU RECEBIDOS</span>
+          <span class="stat-field-value" style="color:${COLOR_HEX.green}">${fmtInt(RESUMO_MES.recebimento.skus)}</span>
+          <span class="stat-field-sub">Total de SKUs</span>
+        </div>
+        <div class="stat-field">
+          <span class="stat-field-label">VALOR TOTAL RECEBIDO (R$)</span>
+          <span class="stat-field-value" style="color:${COLOR_HEX.green}">${fmtMoney(RESUMO_MES.recebimento.valor)}</span>
+          <span class="stat-field-sub">Valor em Reais</span>
+        </div>
+      </div>
+    </div>
+    <div class="stat-card c-purple">
+      <div class="chart-head"><div class="icon-badge">${svg('refresh')}</div><span class="chart-title">3. Inventário Rotativo</span></div>
+      <div class="stat-fields">
+        <div class="stat-field">
+          <span class="stat-field-label">SKU ÚNICO MOVIMENTADO NO MÊS</span>
+          <span class="stat-field-value" style="color:${COLOR_HEX.purple}">${fmtInt(RESUMO_MES.inventarioRotativo.skusUnicos)}</span>
+          <span class="stat-field-sub">Total de SKUs Únicos</span>
+        </div>
+      </div>
+    </div>
+    <div class="stat-card c-red">
+      <div class="chart-head"><div class="icon-badge">${svg('undo')}</div><span class="chart-title">4. Estorno</span></div>
+      <div class="stat-fields">
+        <div class="stat-field">
+          <span class="stat-field-label">QTD. ESTORNOS NO MÊS</span>
+          <span class="stat-field-value" style="color:${COLOR_HEX.red}">${fmtInt(RESUMO_MES.estorno.qtd)}</span>
+          <span class="stat-field-sub">Total de Estornos</span>
+        </div>
+        <div class="stat-field">
+          <span class="stat-field-label">VALOR TOTAL ESTORNADO (R$)</span>
+          <span class="stat-field-value" style="color:${COLOR_HEX.red}">${fmtMoney(RESUMO_MES.estorno.valor)}</span>
+          <span class="stat-field-sub">Valor em Reais</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('chartSkusZerados').innerHTML = `
+    <div class="chart-head"><div class="icon-badge">${svg('lineChart')}</div><span class="chart-title">5. SKUs Zerados por Dia</span></div>
+    <span class="chart-sub">Quantidade de SKUs zerados por dia do mês</span>
+    <div class="chart-body" id="bodySkusZerados"></div>
+  `;
+
+  /* os 3 gráficos SVG só são desenhados depois do próximo frame, quando os divs .chart-body
+     já têm layout aplicado (clientWidth/clientHeight reais) — desenhar antes disso (ex: com a
+     tela ainda escondida via display:none) daria um viewBox 0x0 */
+  requestAnimationFrame(() => {
+    fillChartBody('bodyOrdensReservas', (w,h) => barChartSvg(RESUMO_MES.ordensReservas, w, h, {step:500, refSlots:5}));
+    fillChartBody('bodyTop5Centro', (w,h) => barChartSvg(RESUMO_MES.top5CentroCusto, w, h, {step:500, refSlots:5}));
+    fillChartBody('bodySkusZerados', (w,h) => bigAreaChart(RESUMO_MES.skusZeradosPorDia, COLOR_HEX.green, w, h, {maxVal:250, step:50}));
+  });
+}
+
+function fillChartBody(id, renderFn){
+  const el = document.getElementById(id);
+  if(!el) return;
+  const w = el.clientWidth, h = el.clientHeight;
+  if(w < 10 || h < 10) return;
+  el.innerHTML = renderFn(w, h);
+}
+
 /* navegação: troca de tela, sem lógica funcional nas telas placeholder */
 function goToScreen(id){
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-'+id).classList.add('active');
   document.querySelectorAll('[data-screen]').forEach(el => el.classList.remove('active'));
   document.querySelectorAll(`[data-screen="${id}"]`).forEach(el => el.classList.add('active'));
+  /* Resumo do Mês só ganha layout real (clientWidth/Height) depois de virar .active,
+     então os gráficos SVG só podem ser desenhados neste momento, não no carregamento da página */
+  if(id === 'resumo') requestAnimationFrame(renderResumoMes);
+  /* mesmo motivo: os painéis do Calendário estavam com display:none até agora, então o
+     fitPanels() rodado no carregamento da página não tinha altura real pra medir */
+  if(id === 'calendario') requestAnimationFrame(fitPanels);
 }
 document.querySelectorAll('[data-screen]').forEach(el => {
   el.addEventListener('click', () => goToScreen(el.getAttribute('data-screen')));
+});
+window.addEventListener('resize', () => {
+  if(document.getElementById('screen-resumo').classList.contains('active')) renderResumoMes();
 });
 </script>
 </body>
