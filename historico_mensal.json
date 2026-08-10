@@ -1,0 +1,167 @@
+{
+  "2026-04": {
+    "linhas_atendidas_mes": 1225,
+    "valor_atendido_mes": -852001.16,
+    "reservas_mes": 771,
+    "ordens_mes": 425,
+    "top5_centro_custo": [
+      {
+        "centro_custo": "2003REC",
+        "qtd": 196
+      },
+      {
+        "centro_custo": "2003PRD",
+        "qtd": 152
+      },
+      {
+        "centro_custo": "2003UTL",
+        "qtd": 132
+      },
+      {
+        "centro_custo": "2003MEC",
+        "qtd": 68
+      },
+      {
+        "centro_custo": "2003ELA",
+        "qtd": 66
+      }
+    ],
+    "notas_recebidas_mes": 155,
+    "valor_recebido_mes": 1196134.79,
+    "inventario_rotativo_mes": 1304,
+    "estornos_qtd_mes": 43,
+    "estornos_valor_mes": 35116.74
+  },
+  "2026-05": {
+    "linhas_atendidas_mes": 1915,
+    "valor_atendido_mes": -1582505.76,
+    "reservas_mes": 1077,
+    "ordens_mes": 544,
+    "top5_centro_custo": [
+      {
+        "centro_custo": "2003REC",
+        "qtd": 475
+      },
+      {
+        "centro_custo": "2003LOG",
+        "qtd": 138
+      },
+      {
+        "centro_custo": "2003PRD",
+        "qtd": 110
+      },
+      {
+        "centro_custo": "2003UTL",
+        "qtd": 103
+      },
+      {
+        "centro_custo": "2003MEC",
+        "qtd": 52
+      }
+    ],
+    "notas_recebidas_mes": 145,
+    "valor_recebido_mes": 1190948.93,
+    "inventario_rotativo_mes": 1448,
+    "estornos_qtd_mes": 66,
+    "estornos_valor_mes": 124556.75
+  },
+  "2026-06": {
+    "linhas_atendidas_mes": 2063,
+    "valor_atendido_mes": -2525885.32,
+    "reservas_mes": 1072,
+    "ordens_mes": 462,
+    "top5_centro_custo": [
+      {
+        "centro_custo": "2003REC",
+        "qtd": 479
+      },
+      {
+        "centro_custo": "2003PRD",
+        "qtd": 151
+      },
+      {
+        "centro_custo": "2003LOG",
+        "qtd": 101
+      },
+      {
+        "centro_custo": "2003UTL",
+        "qtd": 90
+      },
+      {
+        "centro_custo": "2003LAB",
+        "qtd": 57
+      }
+    ],
+    "notas_recebidas_mes": 195,
+    "valor_recebido_mes": 1089283.84,
+    "inventario_rotativo_mes": 1673,
+    "estornos_qtd_mes": 299,
+    "estornos_valor_mes": 745795.82
+  },
+  "2026-07": {
+    "linhas_atendidas_mes": 1286,
+    "valor_atendido_mes": -1360823.33,
+    "reservas_mes": 729,
+    "ordens_mes": 475,
+    "top5_centro_custo": [
+      {
+        "centro_custo": "2003REC",
+        "qtd": 205
+      },
+      {
+        "centro_custo": "2003PRD",
+        "qtd": 120
+      },
+      {
+        "centro_custo": "2003UTL",
+        "qtd": 87
+      },
+      {
+        "centro_custo": "2003ADM",
+        "qtd": 59
+      },
+      {
+        "centro_custo": "2003MEC",
+        "qtd": 51
+      }
+    ],
+    "notas_recebidas_mes": 194,
+    "valor_recebido_mes": 1110804.63,
+    "inventario_rotativo_mes": 1334,
+    "estornos_qtd_mes": 14,
+    "estornos_valor_mes": 340659.22
+  },
+  "2026-08": {
+    "linhas_atendidas_mes": 451,
+    "valor_atendido_mes": -265689.16,
+    "reservas_mes": 229,
+    "ordens_mes": 220,
+    "top5_centro_custo": [
+      {
+        "centro_custo": "2003PRD",
+        "qtd": 55
+      },
+      {
+        "centro_custo": "2003REC",
+        "qtd": 49
+      },
+      {
+        "centro_custo": "2003UTL",
+        "qtd": 48
+      },
+      {
+        "centro_custo": "2003ADM",
+        "qtd": 21
+      },
+      {
+        "centro_custo": "2003LAB",
+        "qtd": 15
+      }
+    ],
+    "notas_recebidas_mes": 95,
+    "valor_recebido_mes": 679228.68,
+    "inventario_rotativo_mes": 441,
+    "estornos_qtd_mes": 3,
+    "estornos_valor_mes": 255.57
+  }
+}

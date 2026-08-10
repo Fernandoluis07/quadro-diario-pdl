@@ -94,9 +94,18 @@
   main.content{flex:1; min-width:0; height:100%; overflow:hidden; padding:12px 16px; display:flex; flex-direction:column;}
 
   /* ---------- Card grid ---------- */
-  /* Início fica em duas colunas: grid de cards (flexível, ocupa o espaço que sobra) + coluna
-     fixa de painéis à direita. Ver #screen-inicio.active abaixo e .panels-col mais adiante. */
-  #screen-inicio.active{flex-direction:row; gap:14px;}
+  /* Início: banner condicional (só aparece quando o dado exibido não é de hoje) empilhado sobre
+     o corpo de duas colunas — grid de cards (flexível) + coluna fixa de painéis à direita. Ver
+     .inicio-body/.grid/.panels-col mais adiante. */
+  #screen-inicio.active{flex-direction:column; gap:8px;}
+  .inicio-body{display:flex; flex-direction:row; gap:14px; flex:1; min-height:0;}
+  .inicio-banner{
+    display:none; align-items:center; gap:6px; flex:0 0 auto;
+    background:var(--orange-bg); color:var(--orange); border:1px solid var(--orange);
+    border-radius:8px; padding:5px 12px; font-size:11px; font-weight:700;
+  }
+  .inicio-banner.show{display:flex;}
+  .inicio-banner svg{width:13px; height:13px; flex-shrink:0;}
   /* 20 cards, 5 colunas x 4 linhas exatas, na sequência dos 3 blocos + 2 soltos (sem separação
      visual entre eles — os "blocos" são só a ordem lógica dos cards, não caixas separadas) */
   .grid{
@@ -351,7 +360,7 @@
     .shell{height:auto; overflow:visible;}
     aside.sidebar{height:auto;}
     main.content{height:auto; overflow:visible;}
-    #screen-inicio.active{flex-direction:column;}
+    .inicio-body{flex-direction:column;}
     .grid{flex:0 0 auto; grid-auto-rows:108px; grid-template-columns:repeat(3,1fr); overflow:visible;}
     .panels-col{flex:0 0 auto; flex-direction:row; flex-wrap:wrap;}
     .panel{min-height:150px; flex:1 1 45%;}
@@ -424,9 +433,15 @@
 
     <!-- ===================== INÍCIO ===================== -->
     <section class="screen active" id="screen-inicio">
-      <div class="grid" id="cardGrid"></div>
+      <div class="inicio-banner" id="inicioBanner">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+        <span id="inicioBannerTexto"></span>
+      </div>
 
-      <div class="panels-col">
+      <div class="inicio-body">
+        <div class="grid" id="cardGrid"></div>
+
+        <div class="panels-col">
         <div class="panel p-alert">
           <div class="panel-head">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
@@ -475,6 +490,7 @@
             <div class="vacation-row"><span class="name">Carlos Lima</span><span class="period">10/07 a 19/07</span></div>
           </div>
         </div>
+      </div>
       </div>
     </section>
 
@@ -567,11 +583,7 @@
             <span class="selector-label">MÊS</span>
             <div class="selector-control">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
-              <select id="resumoMesSelect">
-                <option>Julho/2026</option>
-                <option>Junho/2026</option>
-                <option>Maio/2026</option>
-              </select>
+              <select id="resumoMesSelect"></select>
             </div>
           </div>
           <div class="selector-box deposito-box">
@@ -636,7 +648,7 @@
 <footer class="info-bar">
   <div class="info-bar-item">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
-    Data Atual: <b>27/07/2026</b> · Segunda-feira
+    <span id="footerDataLabel">Data Atual</span>: <b id="footerDataValue">—</b><span id="footerDataWeekday"></span>
   </div>
   <div class="info-bar-item">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M6 21V8l6-4 6 4v13M9 21v-6h6v6"/></svg>
@@ -644,7 +656,7 @@
   </div>
   <div class="info-bar-item">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-    Última Atualização: <b>27/07/2026 08:30</b>
+    Última Atualização: <b id="footerUltimaAtualizacao">—</b>
   </div>
 </footer>
 
@@ -799,16 +811,35 @@ function cardHtml(c){
 
 const CARDS = [...BLOCK1, ...BLOCK2, ...BLOCK3, ...LOOSE];
 
+/* Início mostra o dado real mais recente PROCESSADO (mockCardsForDate + inicioReferenceDate,
+   ver mais abaixo) — não é mais o array estático da Fase 1a. A invocação inicial deste render
+   só pode acontecer depois que os objetos HISTORICO_ e mostRecentAvailableDate existirem (ver
+   o final do arquivo) — chamar renderCards() aqui em cima, como era antes, voltaria a quebrar
+   a página inteira com o mesmo ReferenceError de TDZ que já aconteceu uma vez com
+   calSelectedDate. */
 function renderCards(){
-  document.getElementById('cardGrid').innerHTML = CARDS.map(cardHtml).join('');
+  document.getElementById('cardGrid').innerHTML = mockCardsForDate(inicioReferenceDate).map(cardHtml).join('');
+  updateInicioBanner();
 }
-renderCards();
+
+function updateInicioBanner(){
+  const t = today();
+  const ehHoje = sameDay(inicioReferenceDate, t);
+  const fmt = x => x.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric'});
+  document.getElementById('inicioBanner').classList.toggle('show', !ehHoje);
+  if(!ehHoje){
+    document.getElementById('inicioBannerTexto').textContent =
+      `Mostrando o último dia já processado (${fmt(inicioReferenceDate)}) — hoje (${fmt(t)}) ainda não tem dado real disponível.`;
+  }
+  document.getElementById('footerUltimaAtualizacao').textContent = fmt(inicioReferenceDate);
+}
 
 /* ================= Calendário — Fase 1a/parcial: navegação + regras de bloqueio reais.
    Dos 20 cards, 9 já usam dado REAL (histórico da MB51, ver HISTORICO_MB51 abaixo) quando a
    data selecionada tem registro; os outros 11 (ZMM028/MB25/Curva ABC/manuais) continuam mock —
    essa fonte ainda não existe, tratada em etapa separada. ================= */
 const MONTH_NAMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const WEEKDAY_NAMES_LONG = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
 
 /* Histórico real dos 9 indicadores da MB51 (Bloco 1 + Intercompany), gerado por
    backend/historico.py a partir do extrato real (não é mock) — 01/04/2026 a 08/08/2026.
@@ -827,9 +858,20 @@ const HISTORICO_MB51 = {"2026-04-01":{"linhas_atendidas_d009":43,"linhas_atendid
    historico_manuais.json aqui (mesmo formato: {'aaaa-mm-dd': {6 campos}, ...}). */
 const HISTORICO_MANUAL = {"2026-04-01":{"notas_aguardando_lancamento":30,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":17,"pendencias_atendimento_linhas":29},"2026-04-02":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":15,"pendencias_atendimento_linhas":25},"2026-04-03":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":11,"pendencias_atendimento_linhas":19},"2026-04-04":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-04-05":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-04-06":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":15,"pendencias_atendimento_linhas":24},"2026-04-07":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":10,"pendencias_atendimento_linhas":16},"2026-04-08":{"notas_aguardando_lancamento":25,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":6,"pendencias_atendimento_linhas":14},"2026-04-09":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":4,"pendencias_atendimento_linhas":22},"2026-04-10":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":8,"pendencias_atendimento_linhas":14},"2026-04-11":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-04-12":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-04-13":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":11,"pendencias_atendimento_linhas":12},"2026-04-14":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":16,"pendencias_atendimento_linhas":17},"2026-04-15":{"notas_aguardando_lancamento":20,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":14,"pendencias_atendimento_linhas":23},"2026-04-16":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":18,"pendencias_atendimento_linhas":23},"2026-04-17":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":13,"pendencias_atendimento_linhas":20},"2026-04-18":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-04-19":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-04-20":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":14,"pendencias_atendimento_linhas":22},"2026-04-21":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":13,"pendencias_atendimento_linhas":18},"2026-04-22":{"notas_aguardando_lancamento":15,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":11,"pendencias_atendimento_linhas":20},"2026-04-23":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":7,"pendencias_atendimento_linhas":14},"2026-04-24":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":8,"pendencias_atendimento_linhas":9},"2026-04-25":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-04-26":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-04-27":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":8,"pendencias_atendimento_linhas":12},"2026-04-28":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":12,"pendencias_atendimento_linhas":12},"2026-04-29":{"notas_aguardando_lancamento":10,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":7,"pendencias_atendimento_linhas":18},"2026-04-30":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":10,"pendencias_atendimento_linhas":13},"2026-05-01":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":11,"pendencias_atendimento_linhas":19},"2026-05-02":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-05-03":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-05-04":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":10,"pendencias_atendimento_linhas":22},"2026-05-05":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":14,"pendencias_atendimento_linhas":20},"2026-05-06":{"notas_aguardando_lancamento":22,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":10,"pendencias_atendimento_linhas":13},"2026-05-07":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":15,"pendencias_atendimento_linhas":19},"2026-05-08":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":11,"pendencias_atendimento_linhas":18},"2026-05-09":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-05-10":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-05-11":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":7,"pendencias_atendimento_linhas":22},"2026-05-12":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":6,"pendencias_atendimento_linhas":28},"2026-05-13":{"notas_aguardando_lancamento":17,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":11,"pendencias_atendimento_linhas":31},"2026-05-14":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":8,"pendencias_atendimento_linhas":34},"2026-05-15":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":8,"pendencias_atendimento_linhas":32},"2026-05-16":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-05-17":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-05-18":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":13,"pendencias_atendimento_linhas":32},"2026-05-19":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":18,"pendencias_atendimento_linhas":26},"2026-05-20":{"notas_aguardando_lancamento":12,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":22,"pendencias_atendimento_linhas":23},"2026-05-21":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":25,"pendencias_atendimento_linhas":27},"2026-05-22":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":27,"pendencias_atendimento_linhas":31},"2026-05-23":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-05-24":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-05-25":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":26,"pendencias_atendimento_linhas":30},"2026-05-26":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":31,"pendencias_atendimento_linhas":32},"2026-05-27":{"notas_aguardando_lancamento":8,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":26,"pendencias_atendimento_linhas":31},"2026-05-28":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":21,"pendencias_atendimento_linhas":33},"2026-05-29":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":22,"pendencias_atendimento_linhas":33},"2026-05-30":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-05-31":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-06-01":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":18,"pendencias_atendimento_linhas":31},"2026-06-02":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":22,"pendencias_atendimento_linhas":33},"2026-06-03":{"notas_aguardando_lancamento":28,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":20,"pendencias_atendimento_linhas":40},"2026-06-04":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":21,"pendencias_atendimento_linhas":46},"2026-06-05":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":18,"pendencias_atendimento_linhas":46},"2026-06-06":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-06-07":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-06-08":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":15,"pendencias_atendimento_linhas":45},"2026-06-09":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":18,"pendencias_atendimento_linhas":45},"2026-06-10":{"notas_aguardando_lancamento":20,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":22,"pendencias_atendimento_linhas":50},"2026-06-11":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":26,"pendencias_atendimento_linhas":54},"2026-06-12":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":26,"pendencias_atendimento_linhas":53},"2026-06-13":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-06-14":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-06-15":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":23,"pendencias_atendimento_linhas":61},"2026-06-16":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":25,"pendencias_atendimento_linhas":55},"2026-06-17":{"notas_aguardando_lancamento":18,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":20,"pendencias_atendimento_linhas":50},"2026-06-18":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":17,"pendencias_atendimento_linhas":47},"2026-06-19":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":22,"pendencias_atendimento_linhas":52},"2026-06-20":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-06-21":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-06-22":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":26,"pendencias_atendimento_linhas":46},"2026-06-23":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":27,"pendencias_atendimento_linhas":50},"2026-06-24":{"notas_aguardando_lancamento":12,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":31,"pendencias_atendimento_linhas":56},"2026-06-25":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":34,"pendencias_atendimento_linhas":56},"2026-06-26":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":37,"pendencias_atendimento_linhas":48},"2026-06-27":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-06-28":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-06-29":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":40,"pendencias_atendimento_linhas":43},"2026-06-30":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":40,"pendencias_atendimento_linhas":43},"2026-07-01":{"notas_aguardando_lancamento":37,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":17,"reservas_pendentes":30,"pendencias_atendimento_linhas":31},"2026-07-02":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":17,"reservas_pendentes":29,"pendencias_atendimento_linhas":30},"2026-07-03":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":17,"reservas_pendentes":35,"pendencias_atendimento_linhas":46},"2026-07-04":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-07-05":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-07-06":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":17,"reservas_pendentes":32,"pendencias_atendimento_linhas":33},"2026-07-07":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":17,"reservas_pendentes":26,"pendencias_atendimento_linhas":34},"2026-07-08":{"notas_aguardando_lancamento":25,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":12,"reservas_pendentes":27,"pendencias_atendimento_linhas":36},"2026-07-09":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":12,"reservas_pendentes":27,"pendencias_atendimento_linhas":36},"2026-07-10":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":12,"reservas_pendentes":33,"pendencias_atendimento_linhas":41},"2026-07-11":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-07-12":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-07-13":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":12,"reservas_pendentes":29,"pendencias_atendimento_linhas":38},"2026-07-14":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":12,"reservas_pendentes":25,"pendencias_atendimento_linhas":34},"2026-07-15":{"notas_aguardando_lancamento":25,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":12,"reservas_pendentes":28,"pendencias_atendimento_linhas":37},"2026-07-16":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":12,"reservas_pendentes":26,"pendencias_atendimento_linhas":63},"2026-07-17":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":10,"reservas_pendentes":28,"pendencias_atendimento_linhas":39},"2026-07-18":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-07-19":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-07-20":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":12,"reservas_pendentes":27,"pendencias_atendimento_linhas":37},"2026-07-21":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":12,"reservas_pendentes":27,"pendencias_atendimento_linhas":40},"2026-07-22":{"notas_aguardando_lancamento":17,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":12,"reservas_pendentes":26,"pendencias_atendimento_linhas":37},"2026-07-23":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":6,"reservas_pendentes":30,"pendencias_atendimento_linhas":42},"2026-07-24":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":6,"reservas_pendentes":23,"pendencias_atendimento_linhas":32},"2026-07-25":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-07-26":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":0,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-07-27":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":6,"reservas_pendentes":23,"pendencias_atendimento_linhas":32},"2026-07-28":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":26,"pendencias_atendimento_linhas":35},"2026-07-29":{"notas_aguardando_lancamento":38,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":16,"pendencias_atendimento_linhas":31},"2026-07-30":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":18,"pendencias_atendimento_linhas":33},"2026-07-31":{"notas_aguardando_lancamento":0,"devolucao":0,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":32,"pendencias_atendimento_linhas":55},"2026-08-01":{"notas_aguardando_lancamento":0,"devolucao":4,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-08-02":{"notas_aguardando_lancamento":0,"devolucao":4,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-08-03":{"notas_aguardando_lancamento":0,"devolucao":4,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":25,"pendencias_atendimento_linhas":65},"2026-08-04":{"notas_aguardando_lancamento":0,"devolucao":4,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":23,"pendencias_atendimento_linhas":39},"2026-08-05":{"notas_aguardando_lancamento":62,"devolucao":4,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":33,"pendencias_atendimento_linhas":74},"2026-08-06":{"notas_aguardando_lancamento":0,"devolucao":4,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":33,"pendencias_atendimento_linhas":78},"2026-08-07":{"notas_aguardando_lancamento":0,"devolucao":4,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":32,"pendencias_atendimento_linhas":78},"2026-08-08":{"notas_aguardando_lancamento":0,"devolucao":4,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":0,"pendencias_atendimento_linhas":0},"2026-08-09":{"notas_aguardando_lancamento":0,"devolucao":4,"scanner_documentos":0,"nf_pendente_faturamento":5,"reservas_pendentes":0,"pendencias_atendimento_linhas":0}};
 
+/* Histórico de 3 dos 4 indicadores da ZMM028 (planilha reconstruída retroativamente, célula a
+   célula, revalidada contra o dado real de 08/08/2026 — 5.335 itens em estoque com saldo — ver
+   backend/historico_zmm028.py) — 01/04/2026 a 08/08/2026. 'itens_sem_endereco' (4º indicador
+   deste bloco) não tem fonte retroativa nenhuma ainda: fica fixo em 0 nesse intervalo inteiro,
+   por instrução explícita, não é dado real. */
+const HISTORICO_ZMM028 = {"2026-04-01":{"itens_estoque_com_saldo":5328,"itens_mrp_saldo_zero":365,"valor_estoque_total":29251684.99,"itens_sem_endereco":0},"2026-04-02":{"itens_estoque_com_saldo":5343,"itens_mrp_saldo_zero":349,"valor_estoque_total":29429233.59,"itens_sem_endereco":0},"2026-04-03":{"itens_estoque_com_saldo":5357,"itens_mrp_saldo_zero":335,"valor_estoque_total":29451795.32,"itens_sem_endereco":0},"2026-04-04":{"itens_estoque_com_saldo":5357,"itens_mrp_saldo_zero":335,"valor_estoque_total":29451795.32,"itens_sem_endereco":0},"2026-04-05":{"itens_estoque_com_saldo":5357,"itens_mrp_saldo_zero":335,"valor_estoque_total":29451795.32,"itens_sem_endereco":0},"2026-04-06":{"itens_estoque_com_saldo":5360,"itens_mrp_saldo_zero":335,"valor_estoque_total":29382313.45,"itens_sem_endereco":0},"2026-04-07":{"itens_estoque_com_saldo":5359,"itens_mrp_saldo_zero":334,"valor_estoque_total":29398053.68,"itens_sem_endereco":0},"2026-04-08":{"itens_estoque_com_saldo":5348,"itens_mrp_saldo_zero":344,"valor_estoque_total":29371877.79,"itens_sem_endereco":0},"2026-04-09":{"itens_estoque_com_saldo":5360,"itens_mrp_saldo_zero":331,"valor_estoque_total":29401352.52,"itens_sem_endereco":0},"2026-04-10":{"itens_estoque_com_saldo":5391,"itens_mrp_saldo_zero":297,"valor_estoque_total":29664305.17,"itens_sem_endereco":0},"2026-04-11":{"itens_estoque_com_saldo":5391,"itens_mrp_saldo_zero":297,"valor_estoque_total":29664305.17,"itens_sem_endereco":0},"2026-04-12":{"itens_estoque_com_saldo":5391,"itens_mrp_saldo_zero":297,"valor_estoque_total":29664305.17,"itens_sem_endereco":0},"2026-04-13":{"itens_estoque_com_saldo":5394,"itens_mrp_saldo_zero":292,"valor_estoque_total":29757246.1,"itens_sem_endereco":0},"2026-04-14":{"itens_estoque_com_saldo":5390,"itens_mrp_saldo_zero":296,"valor_estoque_total":29727802.95,"itens_sem_endereco":0},"2026-04-15":{"itens_estoque_com_saldo":5389,"itens_mrp_saldo_zero":296,"valor_estoque_total":29636614.86,"itens_sem_endereco":0},"2026-04-16":{"itens_estoque_com_saldo":5396,"itens_mrp_saldo_zero":286,"valor_estoque_total":29526996.1,"itens_sem_endereco":0},"2026-04-17":{"itens_estoque_com_saldo":5395,"itens_mrp_saldo_zero":288,"valor_estoque_total":29519079.17,"itens_sem_endereco":0},"2026-04-18":{"itens_estoque_com_saldo":5395,"itens_mrp_saldo_zero":288,"valor_estoque_total":29519079.17,"itens_sem_endereco":0},"2026-04-19":{"itens_estoque_com_saldo":5395,"itens_mrp_saldo_zero":288,"valor_estoque_total":29519079.17,"itens_sem_endereco":0},"2026-04-20":{"itens_estoque_com_saldo":5394,"itens_mrp_saldo_zero":289,"valor_estoque_total":29501573.32,"itens_sem_endereco":0},"2026-04-21":{"itens_estoque_com_saldo":5394,"itens_mrp_saldo_zero":289,"valor_estoque_total":29501573.32,"itens_sem_endereco":0},"2026-04-22":{"itens_estoque_com_saldo":5395,"itens_mrp_saldo_zero":285,"valor_estoque_total":29538801.17,"itens_sem_endereco":0},"2026-04-23":{"itens_estoque_com_saldo":5404,"itens_mrp_saldo_zero":276,"valor_estoque_total":29641729.9,"itens_sem_endereco":0},"2026-04-24":{"itens_estoque_com_saldo":5400,"itens_mrp_saldo_zero":278,"valor_estoque_total":29635875.59,"itens_sem_endereco":0},"2026-04-25":{"itens_estoque_com_saldo":5400,"itens_mrp_saldo_zero":278,"valor_estoque_total":29635875.59,"itens_sem_endereco":0},"2026-04-26":{"itens_estoque_com_saldo":5400,"itens_mrp_saldo_zero":278,"valor_estoque_total":29635875.59,"itens_sem_endereco":0},"2026-04-27":{"itens_estoque_com_saldo":5396,"itens_mrp_saldo_zero":282,"valor_estoque_total":29618002.41,"itens_sem_endereco":0},"2026-04-28":{"itens_estoque_com_saldo":5394,"itens_mrp_saldo_zero":284,"valor_estoque_total":29598002.59,"itens_sem_endereco":0},"2026-04-29":{"itens_estoque_com_saldo":5391,"itens_mrp_saldo_zero":287,"valor_estoque_total":29514608.7,"itens_sem_endereco":0},"2026-04-30":{"itens_estoque_com_saldo":5384,"itens_mrp_saldo_zero":293,"valor_estoque_total":29448651.09,"itens_sem_endereco":0},"2026-05-01":{"itens_estoque_com_saldo":5384,"itens_mrp_saldo_zero":293,"valor_estoque_total":29448651.09,"itens_sem_endereco":0},"2026-05-02":{"itens_estoque_com_saldo":5384,"itens_mrp_saldo_zero":293,"valor_estoque_total":29448651.09,"itens_sem_endereco":0},"2026-05-03":{"itens_estoque_com_saldo":5384,"itens_mrp_saldo_zero":293,"valor_estoque_total":29448651.09,"itens_sem_endereco":0},"2026-05-04":{"itens_estoque_com_saldo":5391,"itens_mrp_saldo_zero":285,"valor_estoque_total":29832688.2,"itens_sem_endereco":0},"2026-05-05":{"itens_estoque_com_saldo":5394,"itens_mrp_saldo_zero":282,"valor_estoque_total":29884276.67,"itens_sem_endereco":0},"2026-05-06":{"itens_estoque_com_saldo":5393,"itens_mrp_saldo_zero":284,"valor_estoque_total":29875569.75,"itens_sem_endereco":0},"2026-05-07":{"itens_estoque_com_saldo":5408,"itens_mrp_saldo_zero":267,"valor_estoque_total":29908909.23,"itens_sem_endereco":0},"2026-05-08":{"itens_estoque_com_saldo":5411,"itens_mrp_saldo_zero":263,"valor_estoque_total":29882229.2,"itens_sem_endereco":0},"2026-05-09":{"itens_estoque_com_saldo":5411,"itens_mrp_saldo_zero":263,"valor_estoque_total":29882229.2,"itens_sem_endereco":0},"2026-05-10":{"itens_estoque_com_saldo":5411,"itens_mrp_saldo_zero":263,"valor_estoque_total":29882229.2,"itens_sem_endereco":0},"2026-05-11":{"itens_estoque_com_saldo":5433,"itens_mrp_saldo_zero":240,"valor_estoque_total":30052948.51,"itens_sem_endereco":0},"2026-05-12":{"itens_estoque_com_saldo":5423,"itens_mrp_saldo_zero":247,"valor_estoque_total":29841157.53,"itens_sem_endereco":0},"2026-05-13":{"itens_estoque_com_saldo":5423,"itens_mrp_saldo_zero":247,"valor_estoque_total":29841157.53,"itens_sem_endereco":0},"2026-05-14":{"itens_estoque_com_saldo":5426,"itens_mrp_saldo_zero":244,"valor_estoque_total":29869255.13,"itens_sem_endereco":0},"2026-05-15":{"itens_estoque_com_saldo":5422,"itens_mrp_saldo_zero":248,"valor_estoque_total":29541601.01,"itens_sem_endereco":0},"2026-05-16":{"itens_estoque_com_saldo":5421,"itens_mrp_saldo_zero":249,"valor_estoque_total":29537510.27,"itens_sem_endereco":0},"2026-05-17":{"itens_estoque_com_saldo":5421,"itens_mrp_saldo_zero":249,"valor_estoque_total":29537510.27,"itens_sem_endereco":0},"2026-05-18":{"itens_estoque_com_saldo":5428,"itens_mrp_saldo_zero":242,"valor_estoque_total":29604002.32,"itens_sem_endereco":0},"2026-05-19":{"itens_estoque_com_saldo":5433,"itens_mrp_saldo_zero":237,"valor_estoque_total":29595466.18,"itens_sem_endereco":0},"2026-05-20":{"itens_estoque_com_saldo":5425,"itens_mrp_saldo_zero":242,"valor_estoque_total":29338626.32,"itens_sem_endereco":0},"2026-05-21":{"itens_estoque_com_saldo":5422,"itens_mrp_saldo_zero":244,"valor_estoque_total":29374889.22,"itens_sem_endereco":0},"2026-05-22":{"itens_estoque_com_saldo":5423,"itens_mrp_saldo_zero":242,"valor_estoque_total":29399160.88,"itens_sem_endereco":0},"2026-05-23":{"itens_estoque_com_saldo":5423,"itens_mrp_saldo_zero":242,"valor_estoque_total":29399160.88,"itens_sem_endereco":0},"2026-05-24":{"itens_estoque_com_saldo":5423,"itens_mrp_saldo_zero":242,"valor_estoque_total":29399160.88,"itens_sem_endereco":0},"2026-05-25":{"itens_estoque_com_saldo":5418,"itens_mrp_saldo_zero":245,"valor_estoque_total":29361447.98,"itens_sem_endereco":0},"2026-05-26":{"itens_estoque_com_saldo":5413,"itens_mrp_saldo_zero":250,"valor_estoque_total":29281357.97,"itens_sem_endereco":0},"2026-05-27":{"itens_estoque_com_saldo":5409,"itens_mrp_saldo_zero":253,"valor_estoque_total":29226195.93,"itens_sem_endereco":0},"2026-05-28":{"itens_estoque_com_saldo":5405,"itens_mrp_saldo_zero":257,"valor_estoque_total":29176844.54,"itens_sem_endereco":0},"2026-05-29":{"itens_estoque_com_saldo":5392,"itens_mrp_saldo_zero":261,"valor_estoque_total":29030996.65,"itens_sem_endereco":0},"2026-05-30":{"itens_estoque_com_saldo":5392,"itens_mrp_saldo_zero":261,"valor_estoque_total":29030996.65,"itens_sem_endereco":0},"2026-05-31":{"itens_estoque_com_saldo":5392,"itens_mrp_saldo_zero":261,"valor_estoque_total":29030996.65,"itens_sem_endereco":0},"2026-06-01":{"itens_estoque_com_saldo":5376,"itens_mrp_saldo_zero":263,"valor_estoque_total":29129500.08,"itens_sem_endereco":0},"2026-06-02":{"itens_estoque_com_saldo":5381,"itens_mrp_saldo_zero":256,"valor_estoque_total":29197566.4,"itens_sem_endereco":0},"2026-06-03":{"itens_estoque_com_saldo":5378,"itens_mrp_saldo_zero":256,"valor_estoque_total":28903632.68,"itens_sem_endereco":0},"2026-06-04":{"itens_estoque_com_saldo":5408,"itens_mrp_saldo_zero":227,"valor_estoque_total":29104725.45,"itens_sem_endereco":0},"2026-06-05":{"itens_estoque_com_saldo":5405,"itens_mrp_saldo_zero":230,"valor_estoque_total":29174785.33,"itens_sem_endereco":0},"2026-06-06":{"itens_estoque_com_saldo":5405,"itens_mrp_saldo_zero":230,"valor_estoque_total":29174785.33,"itens_sem_endereco":0},"2026-06-07":{"itens_estoque_com_saldo":5405,"itens_mrp_saldo_zero":230,"valor_estoque_total":29174785.33,"itens_sem_endereco":0},"2026-06-08":{"itens_estoque_com_saldo":5401,"itens_mrp_saldo_zero":233,"valor_estoque_total":29126212.87,"itens_sem_endereco":0},"2026-06-09":{"itens_estoque_com_saldo":5397,"itens_mrp_saldo_zero":234,"valor_estoque_total":29108749.29,"itens_sem_endereco":0},"2026-06-10":{"itens_estoque_com_saldo":5392,"itens_mrp_saldo_zero":238,"valor_estoque_total":28980472.32,"itens_sem_endereco":0},"2026-06-11":{"itens_estoque_com_saldo":5394,"itens_mrp_saldo_zero":233,"valor_estoque_total":28998233.6,"itens_sem_endereco":0},"2026-06-12":{"itens_estoque_com_saldo":5412,"itens_mrp_saldo_zero":215,"valor_estoque_total":29063940.97,"itens_sem_endereco":0},"2026-06-13":{"itens_estoque_com_saldo":5412,"itens_mrp_saldo_zero":215,"valor_estoque_total":29063940.97,"itens_sem_endereco":0},"2026-06-14":{"itens_estoque_com_saldo":5412,"itens_mrp_saldo_zero":215,"valor_estoque_total":29063940.97,"itens_sem_endereco":0},"2026-06-15":{"itens_estoque_com_saldo":5412,"itens_mrp_saldo_zero":214,"valor_estoque_total":29073336.68,"itens_sem_endereco":0},"2026-06-16":{"itens_estoque_com_saldo":5407,"itens_mrp_saldo_zero":218,"valor_estoque_total":29014972.93,"itens_sem_endereco":0},"2026-06-17":{"itens_estoque_com_saldo":5405,"itens_mrp_saldo_zero":219,"valor_estoque_total":28913764.24,"itens_sem_endereco":0},"2026-06-18":{"itens_estoque_com_saldo":5386,"itens_mrp_saldo_zero":220,"valor_estoque_total":28482555.12,"itens_sem_endereco":0},"2026-06-19":{"itens_estoque_com_saldo":5394,"itens_mrp_saldo_zero":213,"valor_estoque_total":28487609.87,"itens_sem_endereco":0},"2026-06-20":{"itens_estoque_com_saldo":5394,"itens_mrp_saldo_zero":213,"valor_estoque_total":28465649.21,"itens_sem_endereco":0},"2026-06-21":{"itens_estoque_com_saldo":5394,"itens_mrp_saldo_zero":213,"valor_estoque_total":28465649.21,"itens_sem_endereco":0},"2026-06-22":{"itens_estoque_com_saldo":5403,"itens_mrp_saldo_zero":204,"valor_estoque_total":28749935.29,"itens_sem_endereco":0},"2026-06-23":{"itens_estoque_com_saldo":5399,"itens_mrp_saldo_zero":206,"valor_estoque_total":28735923.58,"itens_sem_endereco":0},"2026-06-24":{"itens_estoque_com_saldo":5391,"itens_mrp_saldo_zero":211,"valor_estoque_total":28664124.96,"itens_sem_endereco":0},"2026-06-25":{"itens_estoque_com_saldo":5387,"itens_mrp_saldo_zero":214,"valor_estoque_total":28643896.81,"itens_sem_endereco":0},"2026-06-26":{"itens_estoque_com_saldo":5384,"itens_mrp_saldo_zero":217,"valor_estoque_total":28640466.84,"itens_sem_endereco":0},"2026-06-27":{"itens_estoque_com_saldo":5384,"itens_mrp_saldo_zero":217,"valor_estoque_total":28640466.84,"itens_sem_endereco":0},"2026-06-28":{"itens_estoque_com_saldo":5384,"itens_mrp_saldo_zero":217,"valor_estoque_total":28640466.84,"itens_sem_endereco":0},"2026-06-29":{"itens_estoque_com_saldo":5381,"itens_mrp_saldo_zero":219,"valor_estoque_total":28448515.6,"itens_sem_endereco":0},"2026-06-30":{"itens_estoque_com_saldo":5379,"itens_mrp_saldo_zero":220,"valor_estoque_total":28403039.14,"itens_sem_endereco":0},"2026-07-01":{"itens_estoque_com_saldo":5388,"itens_mrp_saldo_zero":209,"valor_estoque_total":28442503.35,"itens_sem_endereco":0},"2026-07-02":{"itens_estoque_com_saldo":5422,"itens_mrp_saldo_zero":174,"valor_estoque_total":28609383.69,"itens_sem_endereco":0},"2026-07-03":{"itens_estoque_com_saldo":5429,"itens_mrp_saldo_zero":167,"valor_estoque_total":28732536.06,"itens_sem_endereco":0},"2026-07-04":{"itens_estoque_com_saldo":5429,"itens_mrp_saldo_zero":167,"valor_estoque_total":28732536.06,"itens_sem_endereco":0},"2026-07-05":{"itens_estoque_com_saldo":5429,"itens_mrp_saldo_zero":167,"valor_estoque_total":28732536.06,"itens_sem_endereco":0},"2026-07-06":{"itens_estoque_com_saldo":5436,"itens_mrp_saldo_zero":160,"valor_estoque_total":28726153.57,"itens_sem_endereco":0},"2026-07-07":{"itens_estoque_com_saldo":5432,"itens_mrp_saldo_zero":162,"valor_estoque_total":28612989.21,"itens_sem_endereco":0},"2026-07-08":{"itens_estoque_com_saldo":5361,"itens_mrp_saldo_zero":163,"valor_estoque_total":28369060.29,"itens_sem_endereco":0},"2026-07-09":{"itens_estoque_com_saldo":5358,"itens_mrp_saldo_zero":166,"valor_estoque_total":28441716.49,"itens_sem_endereco":0},"2026-07-10":{"itens_estoque_com_saldo":5354,"itens_mrp_saldo_zero":169,"valor_estoque_total":28414476.6,"itens_sem_endereco":0},"2026-07-11":{"itens_estoque_com_saldo":5354,"itens_mrp_saldo_zero":169,"valor_estoque_total":28414476.6,"itens_sem_endereco":0},"2026-07-12":{"itens_estoque_com_saldo":5354,"itens_mrp_saldo_zero":169,"valor_estoque_total":28414476.6,"itens_sem_endereco":0},"2026-07-13":{"itens_estoque_com_saldo":5348,"itens_mrp_saldo_zero":175,"valor_estoque_total":28350772.01,"itens_sem_endereco":0},"2026-07-14":{"itens_estoque_com_saldo":5346,"itens_mrp_saldo_zero":176,"valor_estoque_total":28449976.44,"itens_sem_endereco":0},"2026-07-15":{"itens_estoque_com_saldo":5353,"itens_mrp_saldo_zero":169,"valor_estoque_total":28487082.46,"itens_sem_endereco":0},"2026-07-16":{"itens_estoque_com_saldo":5366,"itens_mrp_saldo_zero":156,"valor_estoque_total":28629535.15,"itens_sem_endereco":0},"2026-07-17":{"itens_estoque_com_saldo":5365,"itens_mrp_saldo_zero":157,"valor_estoque_total":28747415.31,"itens_sem_endereco":0},"2026-07-18":{"itens_estoque_com_saldo":5365,"itens_mrp_saldo_zero":157,"valor_estoque_total":28747415.31,"itens_sem_endereco":0},"2026-07-19":{"itens_estoque_com_saldo":5365,"itens_mrp_saldo_zero":157,"valor_estoque_total":28747415.31,"itens_sem_endereco":0},"2026-07-20":{"itens_estoque_com_saldo":5365,"itens_mrp_saldo_zero":157,"valor_estoque_total":28726557.73,"itens_sem_endereco":0},"2026-07-21":{"itens_estoque_com_saldo":5366,"itens_mrp_saldo_zero":156,"valor_estoque_total":28757427.86,"itens_sem_endereco":0},"2026-07-22":{"itens_estoque_com_saldo":5367,"itens_mrp_saldo_zero":154,"valor_estoque_total":28778992.58,"itens_sem_endereco":0},"2026-07-23":{"itens_estoque_com_saldo":5366,"itens_mrp_saldo_zero":154,"valor_estoque_total":28820605.39,"itens_sem_endereco":0},"2026-07-24":{"itens_estoque_com_saldo":5363,"itens_mrp_saldo_zero":155,"valor_estoque_total":28810481.64,"itens_sem_endereco":0},"2026-07-25":{"itens_estoque_com_saldo":5363,"itens_mrp_saldo_zero":155,"valor_estoque_total":28810481.64,"itens_sem_endereco":0},"2026-07-26":{"itens_estoque_com_saldo":5363,"itens_mrp_saldo_zero":155,"valor_estoque_total":28810481.64,"itens_sem_endereco":0},"2026-07-27":{"itens_estoque_com_saldo":5359,"itens_mrp_saldo_zero":158,"valor_estoque_total":28797640.02,"itens_sem_endereco":0},"2026-07-28":{"itens_estoque_com_saldo":5352,"itens_mrp_saldo_zero":163,"valor_estoque_total":28759724.82,"itens_sem_endereco":0},"2026-07-29":{"itens_estoque_com_saldo":5343,"itens_mrp_saldo_zero":169,"valor_estoque_total":28691509.94,"itens_sem_endereco":0},"2026-07-30":{"itens_estoque_com_saldo":5336,"itens_mrp_saldo_zero":175,"valor_estoque_total":28649645.51,"itens_sem_endereco":0},"2026-07-31":{"itens_estoque_com_saldo":5326,"itens_mrp_saldo_zero":185,"valor_estoque_total":28500464.99,"itens_sem_endereco":0},"2026-08-01":{"itens_estoque_com_saldo":5326,"itens_mrp_saldo_zero":185,"valor_estoque_total":28500464.99,"itens_sem_endereco":0},"2026-08-02":{"itens_estoque_com_saldo":5326,"itens_mrp_saldo_zero":185,"valor_estoque_total":28500464.99,"itens_sem_endereco":0},"2026-08-03":{"itens_estoque_com_saldo":5341,"itens_mrp_saldo_zero":169,"valor_estoque_total":28723561.77,"itens_sem_endereco":0},"2026-08-04":{"itens_estoque_com_saldo":5331,"itens_mrp_saldo_zero":179,"valor_estoque_total":28758319.79,"itens_sem_endereco":0},"2026-08-05":{"itens_estoque_com_saldo":5324,"itens_mrp_saldo_zero":185,"valor_estoque_total":28728100.25,"itens_sem_endereco":0},"2026-08-06":{"itens_estoque_com_saldo":5341,"itens_mrp_saldo_zero":168,"valor_estoque_total":28915900.63,"itens_sem_endereco":0},"2026-08-07":{"itens_estoque_com_saldo":5335,"itens_mrp_saldo_zero":174,"valor_estoque_total":28886118.62,"itens_sem_endereco":0},"2026-08-08":{"itens_estoque_com_saldo":5335,"itens_mrp_saldo_zero":174,"valor_estoque_total":28885676.47,"itens_sem_endereco":0}};
+
+/* agregados MENSAIS pro Resumo do Mês (fixo em D009, sem dedup entre dias — ver backend/historico_mensal.py).
+   Cobre só os meses com histórico completo (a partir de 01/04/2026); chave "AAAA-MM". */
+const HISTORICO_MENSAL = {"2026-04":{"linhas_atendidas_mes":1225,"valor_atendido_mes":-852001.16,"reservas_mes":771,"ordens_mes":425,"top5_centro_custo":[{"centro_custo":"2003REC","qtd":196},{"centro_custo":"2003PRD","qtd":152},{"centro_custo":"2003UTL","qtd":132},{"centro_custo":"2003MEC","qtd":68},{"centro_custo":"2003ELA","qtd":66}],"notas_recebidas_mes":155,"valor_recebido_mes":1196134.79,"inventario_rotativo_mes":1304,"estornos_qtd_mes":43,"estornos_valor_mes":35116.74},"2026-05":{"linhas_atendidas_mes":1915,"valor_atendido_mes":-1582505.76,"reservas_mes":1077,"ordens_mes":544,"top5_centro_custo":[{"centro_custo":"2003REC","qtd":475},{"centro_custo":"2003LOG","qtd":138},{"centro_custo":"2003PRD","qtd":110},{"centro_custo":"2003UTL","qtd":103},{"centro_custo":"2003MEC","qtd":52}],"notas_recebidas_mes":145,"valor_recebido_mes":1190948.93,"inventario_rotativo_mes":1448,"estornos_qtd_mes":66,"estornos_valor_mes":124556.75},"2026-06":{"linhas_atendidas_mes":2063,"valor_atendido_mes":-2525885.32,"reservas_mes":1072,"ordens_mes":462,"top5_centro_custo":[{"centro_custo":"2003REC","qtd":479},{"centro_custo":"2003PRD","qtd":151},{"centro_custo":"2003LOG","qtd":101},{"centro_custo":"2003UTL","qtd":90},{"centro_custo":"2003LAB","qtd":57}],"notas_recebidas_mes":195,"valor_recebido_mes":1089283.84,"inventario_rotativo_mes":1673,"estornos_qtd_mes":299,"estornos_valor_mes":745795.82},"2026-07":{"linhas_atendidas_mes":1286,"valor_atendido_mes":-1360823.33,"reservas_mes":729,"ordens_mes":475,"top5_centro_custo":[{"centro_custo":"2003REC","qtd":205},{"centro_custo":"2003PRD","qtd":120},{"centro_custo":"2003UTL","qtd":87},{"centro_custo":"2003ADM","qtd":59},{"centro_custo":"2003MEC","qtd":51}],"notas_recebidas_mes":194,"valor_recebido_mes":1110804.63,"inventario_rotativo_mes":1334,"estornos_qtd_mes":14,"estornos_valor_mes":340659.22},"2026-08":{"linhas_atendidas_mes":451,"valor_atendido_mes":-265689.16,"reservas_mes":229,"ordens_mes":220,"top5_centro_custo":[{"centro_custo":"2003PRD","qtd":55},{"centro_custo":"2003REC","qtd":49},{"centro_custo":"2003UTL","qtd":48},{"centro_custo":"2003ADM","qtd":21},{"centro_custo":"2003LAB","qtd":15}],"notas_recebidas_mes":95,"valor_recebido_mes":679228.68,"inventario_rotativo_mes":441,"estornos_qtd_mes":3,"estornos_valor_mes":255.57}};
+
 /* mapeia o "n" do card (ver CARDS/BLOCK1/LOOSE) pro par [objeto histórico, chave dentro dele] —
-   cobre os 15 indicadores com dado real (9 da MB51 + 6 manuais); os outros 5 (ZMM028 + Curva
-   ABC) não aparecem aqui de propósito, continuam mock até ganharem fonte real. */
+   cobre os 19 indicadores com dado real (9 da MB51 + 6 manuais + 4 da ZMM028); só a Curva ABC
+   (nº17, valor fixo/manual sem série diária) não aparece aqui, continua mock. */
 const HISTORICO_POR_N = {
   1:[HISTORICO_MB51,'linhas_atendidas_d009'],       2:[HISTORICO_MB51,'linhas_atendidas_d016'],
   3:[HISTORICO_MB51,'recebimentos_d009'],           4:[HISTORICO_MB51,'recebimentos_d016'],
@@ -840,6 +882,10 @@ const HISTORICO_POR_N = {
   11:[HISTORICO_MANUAL,'notas_aguardando_lancamento'],
   12:[HISTORICO_MANUAL,'nf_pendente_faturamento'],
   13:[HISTORICO_MANUAL,'devolucao'],
+  14:[HISTORICO_ZMM028,'itens_estoque_com_saldo'],
+  15:[HISTORICO_ZMM028,'valor_estoque_total'],
+  16:[HISTORICO_ZMM028,'itens_mrp_saldo_zero'],
+  18:[HISTORICO_ZMM028,'itens_sem_endereco'],
   19:[HISTORICO_MB51,'intercompany'],
   20:[HISTORICO_MANUAL,'scanner_documentos'],
 };
@@ -886,19 +932,20 @@ function previousBusinessDay(d){
   return dateOnly(x);
 }
 
-/* dia útil sempre "teve movimentação" (premissa razoável — é dia normal de operação). Fim de
-   semana/feriado é exceção: dentro do intervalo com dado real (HISTORICO_MB51), a resposta é a
-   verdade — teve movimentação se qualquer um dos 9 indicadores da MB51 for > 0 naquele dia; sem
-   dado real pra essa data, cai pro mock determinístico por data (~30% dos fins de semana "têm"
-   movimentação, só pra dar exemplo dos dois casos ao testar). Checar o real aqui evita bloquear
-   no calendário um sábado que o histórico já sabe que teve movimento (ou o contrário). */
+/* disponibilidade de um dia no Calendário — precisa passar DUAS portas, nessa ordem:
+   1) PROCESSADO: existir de verdade em HISTORICO_MB51. Isso não é "hoje" em tempo real como no
+      Início (que recalcula ao vivo) — só libera depois que a rotina diária de processamento
+      (backend/historico.py) rodar e incluir aquele dia no JSON congelado. Vale pra QUALQUER
+      dia, inclusive dia de semana e o "hoje" do relógio do sistema: sem entrada no histórico,
+      fica bloqueado, ponto — não existe mais atalho de "dia útil sempre libera".
+   2) Se for fim de semana/feriado JÁ processado, só libera se teve movimentação real de verdade
+      (soma dos 9 indicadores > 0) — fim de semana processado com tudo zerado continua
+      bloqueado. Dia útil processado sempre libera, independente do volume do dia. */
 function hasMovement(d){
+  const diaReal = HISTORICO_MB51[dateOnly(d).toISOString().slice(0,10)];
+  if(!diaReal) return false;
   if(isBusinessDay(d)) return true;
-  const iso = dateOnly(d).toISOString().slice(0,10);
-  const diaReal = HISTORICO_MB51[iso];
-  if(diaReal) return Object.values(diaReal).some(v => v > 0);
-  const rand = seededRandom(hashStr('movimentacao-'+iso));
-  return rand() < 0.3;
+  return Object.values(diaReal).some(v => v > 0);
 }
 
 /* valores "crus" (sem lógica de comparação) pra uma data — só usado como MOCK, quando não há
@@ -912,26 +959,40 @@ function rawValuesForDate(d){
   }));
 }
 
-/* linha de tendência real pros indicadores com histórico (MB51 ou manual): os 8 dias corridos
-   terminando na data selecionada (inclusive), puxados direto do objeto histórico passado — dia
-   fora do intervalo coberto conta como 0 (só acontece pra datas bem no início da safra, perto
-   de 01/04/2026). */
+/* linha de tendência real pros indicadores com histórico (MB51/manual/ZMM028) — 7 pontos, TODOS
+   dias úteis consecutivos (nunca dia corrido de calendário): o último ponto é sempre a data
+   selecionada (dOnly, que pode ser um fim de semana excepcional com movimentação real — nesse
+   caso ele continua sendo o ponto final, é o dia que está sendo mostrado); cada ponto anterior é
+   o dia útil imediatamente antes do seguinte via previousBusinessDay() — terça compara com
+   segunda, quarta com terça, segunda compara com sexta da semana anterior (pula sábado/domingo/
+   feriado por completo, nunca aparecem como ponto no gráfico). Dia fora do intervalo coberto
+   conta como 0 (só acontece pra datas bem no início da safra, perto de 01/04/2026). */
 function realSparklineValues(dOnly, historico, chave){
-  const pts = [];
-  for(let i=7; i>=0; i--){
-    const dt = new Date(dOnly); dt.setDate(dt.getDate()-i);
-    const diaReal = historico[dateOnly(dt).toISOString().slice(0,10)];
-    pts.push(diaReal ? diaReal[chave] : 0);
+  const vals = [];
+  let cursor = dOnly;
+  for(let k=0; k<7; k++){
+    const diaReal = historico[dateOnly(cursor).toISOString().slice(0,10)];
+    vals.push(diaReal ? diaReal[chave] : 0);
+    cursor = previousBusinessDay(cursor);
   }
-  return pts;
+  return vals.reverse(); // construído de hoje pra trás; sparkline espera cronológico (antigo→hoje)
+}
+
+/* formata o valor exibido num card. "Valor do Estoque Total" (nº15) é a única grandeza
+   monetária entre os 20 — mostrado em milhares de reais, arredondado, com separador de milhar
+   BR, igual a regra do backend real (ver formatar_valor_estoque_milhares em
+   backend/html_writer.py). Os outros 19 são contagem simples: mesmo assim levam separador de
+   milhar (fmtInt, já usado no Resumo do Mês), porque alguns já passam de 999 no dado real (ex:
+   Linhas Atendidas num dia grande) e ficariam ilegíveis sem isso. */
+function fmtCardValue(n, valorBruto){
+  return n === 15 ? fmtInt(valorBruto/1000) : fmtInt(valorBruto);
 }
 
 /* dashboard do dia selecionado — os 20 indicadores completos, mesma estrutura do Início.
-   Reaproveita title/icon/color/n originais de CARDS (Início). Pros 15 indicadores com histórico
-   (ver HISTORICO_POR_N: 9 da MB51 + 6 manuais), usa dado REAL quando a data cai dentro do
-   intervalo coberto por aquela fonte; fora disso, ou pros outros 5 indicadores (ZMM028 + Curva
-   ABC, ainda sem fonte real), cai pro mock de sempre. Regras de fim de semana/feriado (aplicam
-   nos dois casos):
+   Reaproveita title/icon/color/n originais de CARDS (Início). Pros 19 indicadores com histórico
+   (ver HISTORICO_POR_N: 9 da MB51 + 6 manuais + 4 da ZMM028), usa dado REAL quando a data cai
+   dentro do intervalo coberto por aquela fonte; fora disso, ou pra Curva ABC (única sem série
+   diária), cai pro mock de sempre. Regras de fim de semana/feriado (aplicam nos dois casos):
    - segunda (ou 1º dia útil após o intervalo) compara sempre com sexta (ou último dia útil
      anterior) — nunca com sábado/domingo — via previousBusinessDay();
    - num fim de semana/feriado COM movimentação excepcional: os indicadores com histórico
@@ -948,6 +1009,12 @@ function mockCardsForDate(d){
   const prevRaw = rawValuesForDate(prevDate);
 
   return CARDS.map((base, i) => {
+    if(base.n === 17){
+      // Curva ABC é meta de negócio fixa (Inventário ABC = 30), não uma medição diária — trava
+      // em 30 sempre, qualquer dia (útil ou não), sem entrar na lógica de histórico/mock/
+      // comparação. Nunca deve variar.
+      return {...base, value:'30', yesterday:'30', dir:'flat', deltaPct:0, spark:[30,30,30,30,30,30,30,30]};
+    }
     const entry = HISTORICO_POR_N[base.n]; // [objetoHistorico, chave] ou undefined
     const [historico, chaveReal] = entry || [];
     const diaReal = historico ? historico[iso] : undefined;
@@ -959,15 +1026,15 @@ function mockCardsForDate(d){
       if(exceptional || !diaAnteriorReal){
         // fim de semana excepcional, ou "ontem" cai fora do intervalo coberto (bem no início
         // da safra) — mostra o valor real de hoje, sem comparação inventada
-        return {...base, value:String(value), yesterday:'', dir:'flat', deltaPct:0, spark, noCompare:true};
+        return {...base, value:fmtCardValue(base.n, value), yesterday:'', dir:'flat', deltaPct:0, spark, noCompare:true};
       }
       const yesterday = diaAnteriorReal[chaveReal];
       const dir = value>yesterday ? 'up' : value<yesterday ? 'down' : 'flat';
       const deltaPct = yesterday===0 ? (value===0?0:100) : +(((value-yesterday)/yesterday)*100).toFixed(1);
-      return {...base, value:String(value), yesterday:String(yesterday), dir, deltaPct, spark};
+      return {...base, value:fmtCardValue(base.n, value), yesterday:fmtCardValue(base.n, yesterday), dir, deltaPct, spark};
     }
 
-    const temFonteReal = !!entry; // MB51 ou manual — qualquer indicador com histórico, mesmo fora do intervalo coberto agora
+    const temFonteReal = !!entry; // MB51/manual/ZMM028 — qualquer indicador com histórico, mesmo fora do intervalo coberto agora
     let value, spark, yesterday, dir, deltaPct;
     if(exceptional){
       const src = temFonteReal ? todayRaw[i] : prevRaw[i];
@@ -979,7 +1046,7 @@ function mockCardsForDate(d){
       dir = value>yesterday ? 'up' : value<yesterday ? 'down' : 'flat';
       deltaPct = yesterday===0 ? (value===0?0:100) : +(((value-yesterday)/yesterday)*100).toFixed(1);
     }
-    return {...base, value:String(value), yesterday: yesterday==null ? '' : String(yesterday), dir, deltaPct, spark, noCompare:exceptional};
+    return {...base, value:fmtCardValue(base.n, value), yesterday: yesterday==null ? '' : fmtCardValue(base.n, yesterday), dir, deltaPct, spark, noCompare:exceptional};
   });
 }
 
@@ -991,13 +1058,23 @@ function mockCardsForDate(d){
    página inteira uma vez: ReferenceError na TDZ do const, sem try/catch, para o script todo). */
 function mostRecentAvailableDate(from){
   let d = dateOnly(from);
-  while(!hasMovement(d)){ d = new Date(d); d.setDate(d.getDate()-1); d = dateOnly(d); }
+  /* trava de segurança: se HISTORICO_MB51 algum dia estiver vazio (ex: antes do primeiro
+     backfill), isso não pode virar um loop sem fim — desiste depois de ~400 dias e devolve o
+     que achou, mesmo bloqueado, em vez de travar a página */
+  let guard = 0;
+  while(!hasMovement(d) && guard < 400){ d = new Date(d); d.setDate(d.getDate()-1); d = dateOnly(d); guard++; }
   return d;
 }
 
 let calViewDate = dateOnly(new Date());                     // mês/ano exibido na grade do dropdown
 let calSelectedDate = mostRecentAvailableDate(new Date());  // dia mostrado no dashboard — padrão: hoje (ou o último dia com movimentação, se hoje não tiver)
 let calOpen = false;                                         // dropdown começa fechado: a tela abre já no dashboard
+
+/* Início usa a mesma busca — "hoje" pro dashboard principal também é o último dia REALMENTE
+   processado, nunca a data do relógio do sistema sem dado por trás (mesma filosofia que o
+   próprio backend já usa pra definir "hoje": ver docstring de backend/main.py). */
+let inicioReferenceDate = mostRecentAvailableDate(new Date());
+renderCards();
 
 /* painéis laterais do dia selecionado — mesmo padrão visual do Início, conteúdo mock que muda
    por data (seed própria, separada da dos cards, pra não repetir os mesmos números "por
@@ -1107,6 +1184,19 @@ function renderCalDashboard(){
     calSelectedDate.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric'});
   document.getElementById('calCardGrid').innerHTML = mockCardsForDate(calSelectedDate).map(cardHtml).join('');
   renderCalPanels(calSelectedDate);
+  updateFooterContext();
+}
+
+/* rodapé mostra qual dia está sendo exibido AGORA — "hoje" real (cálculo ao vivo) em qualquer
+   tela exceto o Calendário, onde mostra o dia selecionado (pode ser um dia passado, não é
+   "hoje"). Chamado ao trocar de aba (goToScreen) e ao trocar de dia no Calendário
+   (renderCalDashboard) — sem isso, o rodapé fica preso no valor estático original pra sempre. */
+function updateFooterContext(){
+  const noCalendario = document.getElementById('screen-calendario').classList.contains('active');
+  const d = noCalendario ? calSelectedDate : today();
+  document.getElementById('footerDataLabel').textContent = noCalendario ? 'Dia selecionado (Calendário)' : 'Data Atual';
+  document.getElementById('footerDataValue').textContent = d.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric'});
+  document.getElementById('footerDataWeekday').textContent = ' · ' + WEEKDAY_NAMES_LONG[d.getDay()];
 }
 
 document.getElementById('calToggleBtn').addEventListener('click', () => setCalOpen(!calOpen));
@@ -1225,11 +1315,15 @@ function bigAreaChart(points, color, w, h, opts={}){
   const plotW = w - padL - padR, plotH = Math.max(h - padT - padB, 1);
   const step = opts.step || 50;
   const maxVal = opts.maxVal || Math.ceil(Math.max(...points)/step)*step;
-  const n = points.length;
-  const stepX = plotW/(n-1);
+  /* totalSlots é o nº de posições no eixo X — o mês inteiro (1 a 28/30/31), não só os dias que já
+     têm dado. Assim o eixo de um mês em andamento reserva o espaço até o fim do mês (dias futuros
+     ficam em branco, sem ponto/linha) em vez de esticar os poucos dias disponíveis pra ocupar o
+     card inteiro — um mês parcial fica visualmente na mesma escala de um mês fechado. */
+  const totalSlots = opts.totalSlots || points.length;
+  const stepX = plotW/(totalSlots-1);
   const pts = points.map((p,i) => [padL + i*stepX, padT + plotH - (p/maxVal)*plotH]);
   const linePath = smoothPath(pts);
-  const areaPath = `${linePath} L${(padL+plotW).toFixed(2)},${(padT+plotH).toFixed(2)} L${padL.toFixed(2)},${(padT+plotH).toFixed(2)} Z`;
+  const areaPath = `${linePath} L${pts[pts.length-1][0].toFixed(2)},${(padT+plotH).toFixed(2)} L${padL.toFixed(2)},${(padT+plotH).toFixed(2)} Z`;
 
   let grid = '';
   for(let v=0; v<=maxVal; v+=step){
@@ -1242,9 +1336,12 @@ function bigAreaChart(points, color, w, h, opts={}){
     `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="2.6" fill="${color}"/>`
     + `<text x="${x.toFixed(2)}" y="${(y-7).toFixed(2)}" font-size="9" font-weight="700" fill="var(--gray-700)" text-anchor="middle">${points[i]}</text>`
   ).join('');
-  const xLabels = pts.map(([x],i) =>
-    `<text x="${x.toFixed(2)}" y="${h-4}" font-size="8.5" fill="var(--gray-500)" text-anchor="middle">${i+1}</text>`
-  ).join('');
+  /* rótulos do eixo X cobrem o mês inteiro (totalSlots), não só os dias com ponto desenhado */
+  let xLabels = '';
+  for(let i=0; i<totalSlots; i++){
+    const x = padL + i*stepX;
+    xLabels += `<text x="${x.toFixed(2)}" y="${h-4}" font-size="8.5" fill="var(--gray-500)" text-anchor="middle">${i+1}</text>`;
+  }
 
   const gid = 'bg'+Math.random().toString(36).slice(2,8);
   return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">
@@ -1259,44 +1356,43 @@ function bigAreaChart(points, color, w, h, opts={}){
   </svg>`;
 }
 
-/* dados fixos/fictícios — Fase 1a / Etapa 1. Etapa 2 troca isto pelo cálculo real
-   (MB51 filtrada pelo mês selecionado, MB25/ZMM028 snapshot do fim do mês etc.),
-   indicador por indicador. */
-const RESUMO_MES = {
-  linhasAtendidas: 1248,
-  valorTotalAtendido: 1285430.75,
-  /* rótulo visível não mostra o BWART — o cálculo por trás continua sendo 201 (Reservas) x 261 (Ordens) */
-  ordensReservas: [
-    { label: 'Reservas', value: 1587, color: 'green' },
-    { label: 'Ordens',   value: 932,  color: 'orange' },
-  ],
-  top5CentroCusto: [
-    { label: '2003-ADM', value: 2003, color: 'red' },
-    { label: '2003-PRO', value: 1456, color: 'blue' },
-    { label: '2003-MAN', value: 1102, color: 'purple' },
-    { label: '2003-LOG', value: 876,  color: 'orange' },
-    { label: '2003-CAL', value: 642,  color: 'green' },
-  ],
-  recebimento: { skus: 1132, valor: 1485650.75 },
-  inventarioRotativo: { skusUnicos: 876 },
-  estorno: { qtd: 142, valor: 85320.40 },
-  /* 31 valores — julho tem 31 dias (dia 1 a dia 31, ver bug corrigido: só havia 30 antes) */
-  skusZeradosPorDia: [
-    180,171,195,165,158,176,150,147,139,160,131,127,123,118,112,
-    109,103,98,89,84,80,76,71,67,63,59,55,53,48,42,38
-  ],
-};
+/* preenche o <select> de mês com os meses reais existentes em HISTORICO_MENSAL, mais recente
+   primeiro (fica selecionado por padrão, é a <option> criada primeiro) */
+function populateResumoMesSelect(){
+  const sel = document.getElementById('resumoMesSelect');
+  const chaves = Object.keys(HISTORICO_MENSAL).sort().reverse();
+  sel.innerHTML = chaves.map(chave => {
+    const [ano, mes] = chave.split('-').map(Number);
+    return `<option value="${chave}">${MONTH_NAMES[mes-1]}/${ano}</option>`;
+  }).join('');
+}
+populateResumoMesSelect();
+document.getElementById('resumoMesSelect').addEventListener('change', renderResumoMes);
+
+/* valores de itens_mrp_saldo_zero (ZMM028) dos dias do mês selecionado, na ordem do calendário —
+   mês corrente/parcial simplesmente não tem os dias futuros em HISTORICO_ZMM028, então a lista
+   já para sozinha no último dia processado; mês fechado devolve o mês inteiro */
+function diasDoMesZmm028(chaveMes){
+  return Object.keys(HISTORICO_ZMM028)
+    .filter(iso => iso.startsWith(chaveMes))
+    .sort()
+    .map(iso => HISTORICO_ZMM028[iso].itens_mrp_saldo_zero);
+}
 
 function renderResumoMes(){
+  const chaveMes = document.getElementById('resumoMesSelect').value;
+  const mes = HISTORICO_MENSAL[chaveMes];
+  if(!mes) return;
+
   document.getElementById('resumoKpis').innerHTML = `
     <div class="kpi-box">
       <span class="kpi-label">LINHAS ATENDIDAS NO MÊS</span>
-      <span class="kpi-value" style="color:${COLOR_HEX.red}">${fmtInt(RESUMO_MES.linhasAtendidas)}</span>
+      <span class="kpi-value" style="color:${COLOR_HEX.red}">${fmtInt(mes.linhas_atendidas_mes)}</span>
       <span class="kpi-sub">Total de Linhas</span>
     </div>
     <div class="kpi-box">
       <span class="kpi-label">VALOR TOTAL ATENDIDO (R$)</span>
-      <span class="kpi-value" style="color:${COLOR_HEX.red}">${fmtMoney(RESUMO_MES.valorTotalAtendido)}</span>
+      <span class="kpi-value" style="color:${COLOR_HEX.red}">${fmtMoney(Math.abs(mes.valor_atendido_mes))}</span>
       <span class="kpi-sub">Valor em Reais</span>
     </div>
   `;
@@ -1318,13 +1414,13 @@ function renderResumoMes(){
       <div class="chart-head"><div class="icon-badge">${svg('truck')}</div><span class="chart-title">2. Recebimento</span></div>
       <div class="stat-fields">
         <div class="stat-field">
-          <span class="stat-field-label">QTD. SKU RECEBIDOS</span>
-          <span class="stat-field-value" style="color:${COLOR_HEX.green}">${fmtInt(RESUMO_MES.recebimento.skus)}</span>
-          <span class="stat-field-sub">Total de SKUs</span>
+          <span class="stat-field-label">QTD. NOTAS RECEBIDAS</span>
+          <span class="stat-field-value" style="color:${COLOR_HEX.green}">${fmtInt(mes.notas_recebidas_mes)}</span>
+          <span class="stat-field-sub">Total de Notas</span>
         </div>
         <div class="stat-field">
           <span class="stat-field-label">VALOR TOTAL RECEBIDO (R$)</span>
-          <span class="stat-field-value" style="color:${COLOR_HEX.green}">${fmtMoney(RESUMO_MES.recebimento.valor)}</span>
+          <span class="stat-field-value" style="color:${COLOR_HEX.green}">${fmtMoney(mes.valor_recebido_mes)}</span>
           <span class="stat-field-sub">Valor em Reais</span>
         </div>
       </div>
@@ -1334,7 +1430,7 @@ function renderResumoMes(){
       <div class="stat-fields">
         <div class="stat-field">
           <span class="stat-field-label">SKU ÚNICO MOVIMENTADO NO MÊS</span>
-          <span class="stat-field-value" style="color:${COLOR_HEX.purple}">${fmtInt(RESUMO_MES.inventarioRotativo.skusUnicos)}</span>
+          <span class="stat-field-value" style="color:${COLOR_HEX.purple}">${fmtInt(mes.inventario_rotativo_mes)}</span>
           <span class="stat-field-sub">Total de SKUs Únicos</span>
         </div>
       </div>
@@ -1344,12 +1440,12 @@ function renderResumoMes(){
       <div class="stat-fields">
         <div class="stat-field">
           <span class="stat-field-label">QTD. ESTORNOS NO MÊS</span>
-          <span class="stat-field-value" style="color:${COLOR_HEX.red}">${fmtInt(RESUMO_MES.estorno.qtd)}</span>
+          <span class="stat-field-value" style="color:${COLOR_HEX.red}">${fmtInt(mes.estornos_qtd_mes)}</span>
           <span class="stat-field-sub">Total de Estornos</span>
         </div>
         <div class="stat-field">
           <span class="stat-field-label">VALOR TOTAL ESTORNADO (R$)</span>
-          <span class="stat-field-value" style="color:${COLOR_HEX.red}">${fmtMoney(RESUMO_MES.estorno.valor)}</span>
+          <span class="stat-field-value" style="color:${COLOR_HEX.red}">${fmtMoney(mes.estornos_valor_mes)}</span>
           <span class="stat-field-sub">Valor em Reais</span>
         </div>
       </div>
@@ -1362,13 +1458,26 @@ function renderResumoMes(){
     <div class="chart-body" id="bodySkusZerados"></div>
   `;
 
+  /* rótulo visível não mostra o BWART — o cálculo por trás é Reservas (Centro custo preenchido)
+     x Ordens (Ordem preenchida), só nas linhas de atendimento (201/221/261/601/122/833/921) */
+  const ordensReservas = [
+    { label: 'Reservas', value: mes.reservas_mes, color: 'green' },
+    { label: 'Ordens',   value: mes.ordens_mes,   color: 'orange' },
+  ];
+  const top5CentroCusto = mes.top5_centro_custo.map((it, i) => ({
+    label: it.centro_custo, value: it.qtd, color: ['red','blue','purple','orange','green'][i],
+  }));
+  const skusZeradosPorDia = diasDoMesZmm028(chaveMes);
+  const [anoMes, mesMes] = chaveMes.split('-').map(Number);
+  const diasNoMes = new Date(anoMes, mesMes, 0).getDate(); // 28/29/30/31 conforme o mês
+
   /* os 3 gráficos SVG só são desenhados depois do próximo frame, quando os divs .chart-body
      já têm layout aplicado (clientWidth/clientHeight reais) — desenhar antes disso (ex: com a
      tela ainda escondida via display:none) daria um viewBox 0x0 */
   requestAnimationFrame(() => {
-    fillChartBody('bodyOrdensReservas', (w,h) => barChartSvg(RESUMO_MES.ordensReservas, w, h, {step:500, refSlots:5}));
-    fillChartBody('bodyTop5Centro', (w,h) => barChartSvg(RESUMO_MES.top5CentroCusto, w, h, {step:500, refSlots:5}));
-    fillChartBody('bodySkusZerados', (w,h) => bigAreaChart(RESUMO_MES.skusZeradosPorDia, COLOR_HEX.green, w, h, {maxVal:250, step:50}));
+    fillChartBody('bodyOrdensReservas', (w,h) => barChartSvg(ordensReservas, w, h, {step:500, refSlots:5}));
+    fillChartBody('bodyTop5Centro', (w,h) => barChartSvg(top5CentroCusto, w, h, {step:500, refSlots:5}));
+    fillChartBody('bodySkusZerados', (w,h) => bigAreaChart(skusZeradosPorDia, COLOR_HEX.green, w, h, {step:50, totalSlots: diasNoMes}));
   });
 }
 
@@ -1392,10 +1501,12 @@ function goToScreen(id){
   /* mesmo motivo: os painéis do Calendário estavam com display:none até agora, então o
      fitPanels() rodado no carregamento da página não tinha altura real pra medir */
   if(id === 'calendario') requestAnimationFrame(fitPanels);
+  updateFooterContext();
 }
 document.querySelectorAll('[data-screen]').forEach(el => {
   el.addEventListener('click', () => goToScreen(el.getAttribute('data-screen')));
 });
+updateFooterContext(); // estado inicial, tela Início ativa por padrão
 window.addEventListener('resize', () => {
   if(document.getElementById('screen-resumo').classList.contains('active')) renderResumoMes();
 });
