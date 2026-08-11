@@ -80,8 +80,8 @@ def _filtrar_deposito_valido(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _filtrar_deposito_d009_vazio(df: pd.DataFrame) -> pd.DataFrame:
-    """MB25 (Pendências) segue a mesma regra dos outros 4 indicadores separados
-    por depósito: só D009+vazio, D016 NÃO entra."""
+    """MB25 (Pendências) e ZMM028 (itens 14/15/16/18) seguem a mesma regra:
+    só D009+vazio, D016 NÃO entra."""
     df = df.copy()
     df["_deposito_norm"] = df["Depósito"].map(normalizar_deposito)
     return df.loc[df["_deposito_norm"] == config.DEPOSITO_D009].copy()
@@ -89,7 +89,7 @@ def _filtrar_deposito_d009_vazio(df: pd.DataFrame) -> pd.DataFrame:
 
 _COLUNAS_MB51 = {"Material", "Depósito", "Tipo de movimento", "Data de lançamento", "Referência"}
 _COLUNAS_MB25 = {"Reserva", "Material", "Depósito"}
-_COLUNAS_ZMM028 = {"Material", "Util.livre", "Val.total", "Pos.dpst.", "Tp.MRP"}
+_COLUNAS_ZMM028 = {"Material", "Depósito", "Util.livre", "Val.total", "Pos.dpst.", "Tp.MRP"}
 
 
 def carregar_mb51(caminho: str) -> pd.DataFrame:
@@ -109,8 +109,10 @@ def carregar_mb25(caminho: str) -> pd.DataFrame:
 
 
 def carregar_zmm028(caminho: str) -> pd.DataFrame:
-    """ZMM028 é um snapshot direto — a regra de filtro de Depósito da seção 3
-    aplica-se apenas a MB51 e MB25, então aqui não filtramos por Depósito."""
+    """ZMM028 é um snapshot direto, mas os indicadores 14/15/16/18 (Itens em
+    Estoque com Saldo, Valor do Estoque Total, Itens MRP Saldo Zero, Itens sem
+    Endereço) só devem considerar D009 — mesma regra de filtro do MB25."""
     df = _ler_excel(caminho, _COLUNAS_ZMM028)
     df = _descartar_linhas_rodape(df)
+    df = _filtrar_deposito_d009_vazio(df)
     return df

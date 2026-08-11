@@ -75,6 +75,10 @@ def test_pipeline_completo_com_planilhas_sinteticas(tmp_path):
             {"Material": "3003", "Denom.": "C", "Unidade": "UN", "Centro": "2003", "Util.livre": 5,
              "Val.total": 250.5, "Pos.dpst.": "", "Tp.MRP": "PD", "Depósito": "D009",
              "Estq.máx.": 50, "Pt.reabast": 10},
+            # D016 -> excluído dos 4 indicadores da ZMM028 (mesma regra do MB25)
+            {"Material": "3004", "Denom.": "D", "Unidade": "UN", "Centro": "2003", "Util.livre": 20,
+             "Val.total": 999.0, "Pos.dpst.": "", "Tp.MRP": "VB", "Depósito": "D016",
+             "Estq.máx.": 50, "Pt.reabast": 10},
         ]
     )
 
@@ -90,6 +94,8 @@ def test_pipeline_completo_com_planilhas_sinteticas(tmp_path):
     assert len(df_mb51) == 3
     # MB25: R11 (D016) também sai — Pendências é D009+vazio só, sem D016
     assert len(df_mb25) == 2
+    # ZMM028: 3004 (D016) sai — indicadores 14/15/16/18 são D009+vazio só, sem D016
+    assert len(df_zmm028) == 3
 
     assert indicadores.linhas_atendidas(df_mb51, "D009", HOJE) == 1  # só 201 (101 é Recebimento, não Atendimento)
     assert indicadores.linhas_atendidas(df_mb51, "D016", HOJE) == 1  # 261

@@ -80,6 +80,8 @@ def reservas_pendentes(df_mb25: pd.DataFrame) -> int:
 
 
 # ---- Bloco 3 — Fotografia do Estoque (ZMM028) ------------------------------
+# ZMM028 já chega pré-filtrada por Depósito D009+vazio (extratos.carregar_zmm028)
+# — D016 NÃO entra em nenhum destes 4 indicadores.
 
 def _util_livre(df: pd.DataFrame) -> pd.Series:
     return pd.to_numeric(df["Util.livre"], errors="coerce").fillna(0)
