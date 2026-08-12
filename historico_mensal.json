@@ -140,6 +140,7 @@
     "valor_atendido_mes": -976880.1,
     "reservas_mes": 303,
     "ordens_mes": 261,
+    "outros_mes": 47,
     "top5_centro_custo": [
       {
         "centro_custo": "2003REC",
@@ -166,7 +167,6 @@
     "valor_recebido_mes": 707743.58,
     "inventario_rotativo_mes": 596,
     "estornos_qtd_mes": 8,
-    "estornos_valor_mes": 923.03,
-    "outros_mes": 47
+    "estornos_valor_mes": 923.03
   }
 }
