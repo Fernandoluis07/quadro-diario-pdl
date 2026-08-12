@@ -69,6 +69,29 @@ MAPEAMENTO_CARD_COM_ONTEM = [
     ("inventario_rotativo_d016", "Inventário Rotativo D016", formatar_inteiro_br),
 ]
 
+# Os 5 indicadores manuais (planilha_manual_quadro_diario.xlsx, aba "Indicadores
+# Diarios") — cada um só é processado se sua chave estiver presente no dict de
+# indicadores (gate por presença, não por valor), pra não quebrar chamadores antigos
+# que nunca preenchem essas chaves (ex: main.calcular_todos_indicadores() sozinho).
+# Intercompany fica numa lista à parte porque seu histórico "ontem" vem de
+# historico_mb51.json/HISTORICO_MB51 (não de historico_manuais.json) — é manual na
+# origem, mas viaja junto com o resto do Bloco 1 no front-end (ver backend/congelar.py).
+MAPEAMENTO_CARD_MANUAL_COM_ONTEM = [
+    ("notas_aguardando_lancamento", "Notas Aguardando Lançamento", formatar_inteiro_br),
+    ("nf_pendente_faturamento", "NF Pendente Faturamento", formatar_inteiro_br),
+    ("devolucao", "Devolução", formatar_inteiro_br),
+    ("scanner_documentos", "Scanner de Documentos", formatar_inteiro_br),
+]
+MAPEAMENTO_CARD_INTERCOMPANY = [
+    ("intercompany", "Intercompany", formatar_inteiro_br),
+]
+
+# (mapeamento, chave no dict de indicadores que guarda o "ontem" daquele grupo)
+_GRUPOS_OPCIONAIS_COM_ONTEM = [
+    (MAPEAMENTO_CARD_MANUAL_COM_ONTEM, "ontem_manual"),
+    (MAPEAMENTO_CARD_INTERCOMPANY, "ontem_intercompany"),
+]
+
 _PADRAO_VALUE = "(title:'{titulo}'\\s*,\\s*value:')([^']*)(')"
 _PADRAO_VALUE_ONTEM_DELTA_DIR = (
     "(title:'{titulo}'\\s*,\\s*value:')([^']*)"
@@ -163,5 +186,15 @@ def atualizar_html(html: str, indicadores: dict) -> tuple[str, list[dict], list[
 
     for chave, titulo, formatador in MAPEAMENTO_CARD:
         html = _atualizar_somente_value(html, chave, titulo, formatador, indicadores, aplicados, nao_encontrados)
+
+    for mapeamento, chave_ontem in _GRUPOS_OPCIONAIS_COM_ONTEM:
+        ontem_grupo = indicadores.get(chave_ontem)
+        for chave, titulo, formatador in mapeamento:
+            if chave not in indicadores:
+                continue
+            if ontem_grupo is not None and chave in ontem_grupo:
+                html = _atualizar_com_ontem(html, chave, titulo, formatador, indicadores, ontem_grupo, aplicados, nao_encontrados)
+            else:
+                html = _atualizar_somente_value(html, chave, titulo, formatador, indicadores, aplicados, nao_encontrados)
 
     return html, aplicados, nao_encontrados

@@ -1,3 +1,7 @@
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Extrações SAP + planilha manual do dia — dado bruto sensível, nunca vai pro git
+# (só os indicadores JÁ CALCULADOS pelo Cabeçalho são publicados).
+/Bases/

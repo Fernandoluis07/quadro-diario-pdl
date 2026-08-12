@@ -1,17 +1,26 @@
-"""Configuração de caminhos e constantes de negócio do Quadro Diário PDL."""
+"""Configuração de caminhos e constantes de negócio do Quadro Diário PDL.
 
-# Pasta de rede onde o usuário substitui as 3 extrações do SAP todo dia,
-# sempre com o mesmo nome de arquivo (sobrescrito).
-# IMPORTANTE: sempre usar caminho UNC completo (\\servidor\...), nunca letra de unidade mapeada
-# (ex: F:\), pois a letra varia de máquina para máquina.
+Roda direto da pasta de rede da empresa — "08. Quadro Diario\\02. Cabeçalho"
+(UNC \\\\fs019flslrv\\DADOS\\...), com "03. Bases" como pasta irmã contendo as
+3 extrações SAP + a planilha manual. Única cópia do projeto (produção).
+"""
+
+# Pasta de rede onde o usuário substitui as 3 extrações do SAP + a planilha manual
+# todo dia, sempre com o mesmo nome de arquivo (sobrescrito).
+# IMPORTANTE: sempre usar caminho UNC completo (\\servidor\...), nunca letra de unidade
+# mapeada (ex: F:\), pois a letra varia de máquina para máquina.
 BASES_DIR = (
     r"\\fs019flslrv\DADOS\ADMINISTRATIVO\GESTÃO E PLANEJAMENTO DE ESTOQUE"
-    r"\ALMOXARIFADO - PDL\05. Procedimento\07. Script Atendimento\Bases"
+    r"\ALMOXARIFADO - PDL\05. Procedimento\08. Quadro Diario\03. Bases"
 )
 
-MB51_FILENAME = "mb51.xlsx"
-MB25_FILENAME = "mb25.xlsx"
+MB51_FILENAME = "MB51.xlsx"
+MB25_FILENAME = "MB25.xlsx"
 ZMM028_FILENAME = "ZMM028.xlsx"
+
+# Hash SHA-256 (nunca a senha em texto puro — este arquivo vai pro GitHub) da senha
+# que libera o reprocessamento forçado de um dia já congelado (ver backend/cabecalho.py).
+SENHA_FORCAR_RECONGELAMENTO_SHA256 = "3d14c2d4e4ced81e459e4ace7c01466a700000fb94a3bbe944a55fb92693e879"
 
 # Depósitos válidos (seção 3 da especificação). Vazio/em branco é tratado como D009.
 DEPOSITO_D009 = "D009"

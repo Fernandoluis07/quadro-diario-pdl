@@ -148,3 +148,58 @@ def test_calcular_delta_crescimento_a_partir_de_zero_nao_quebra():
     dir_, pct = html_writer.calcular_delta(5, 0)
     assert dir_ == "up"
     assert pct == 100.0
+
+
+# ---- Os 5 cards manuais (planilha_manual_quadro_diario.xlsx) --------------
+
+HTML_SINTETICO_COM_MANUAIS = HTML_SINTETICO + """
+const LOOSE = [
+  { n:19, title:'Intercompany',            value:'2', yesterday:'2', deltaPct:0, dir:'flat', color:'orange', icon:'docLine', spark:[2,2] },
+  { n:20, title:'Scanner de Documentos',   value:'0', yesterday:'0', deltaPct:0, dir:'flat', color:'orange', icon:'scan',    spark:[0,0] },
+];
+"""
+
+
+def test_ignora_cards_manuais_quando_chaves_nao_estao_no_dict():
+    """Chamador antigo (main.calcular_todos_indicadores sozinho, sem passar pela
+    planilha manual) não deve ter os 5 cards manuais tocados nem contados como
+    'não encontrados' — são opcionais, gate por presença de chave."""
+    novo_html, aplicados, nao_encontrados = html_writer.atualizar_html(HTML_SINTETICO_COM_MANUAIS, INDICADORES)
+    assert not any(a["indicador"] == "intercompany" for a in aplicados)
+    assert not any(a["indicador"] == "scanner_documentos" for a in aplicados)
+    assert "Intercompany" not in nao_encontrados
+    assert "Scanner de Documentos" not in nao_encontrados
+
+
+def test_atualiza_cards_manuais_sem_ontem():
+    indicadores = dict(INDICADORES, notas_aguardando_lancamento=7, nf_pendente_faturamento=3, devolucao=1, scanner_documentos=4, intercompany=9)
+    novo_html, aplicados, _ = html_writer.atualizar_html(HTML_SINTETICO_COM_MANUAIS, indicadores)
+    assert "title:'Intercompany',            value:'9'" in novo_html
+    assert "title:'Scanner de Documentos',   value:'4'" in novo_html
+    item = next(a for a in aplicados if a["indicador"] == "intercompany")
+    assert item["valor_novo"] == "9"
+    assert "yesterday_novo" not in item
+
+
+def test_atualiza_cards_manuais_com_ontem_manual_e_ontem_intercompany():
+    indicadores = dict(
+        INDICADORES,
+        notas_aguardando_lancamento=7, nf_pendente_faturamento=3, devolucao=1, scanner_documentos=4, intercompany=9,
+        ontem_manual={"notas_aguardando_lancamento": 0, "nf_pendente_faturamento": 0, "devolucao": 0, "scanner_documentos": 2},
+        ontem_intercompany={"intercompany": 3},
+    )
+    novo_html, aplicados, _ = html_writer.atualizar_html(HTML_SINTETICO_COM_MANUAIS, indicadores)
+    # 4 vs 2 -> up, +100%
+    assert "title:'Scanner de Documentos',   value:'4', yesterday:'2', deltaPct:100.0, dir:'up'" in novo_html
+    # 9 vs 3 -> up, +200%
+    assert "title:'Intercompany',            value:'9', yesterday:'3', deltaPct:200.0, dir:'up'" in novo_html
+    item = next(a for a in aplicados if a["indicador"] == "scanner_documentos")
+    assert item["yesterday_novo"] == "2"
+    assert item["dir_novo"] == "up"
+
+
+def test_curva_abc_continua_intocavel_mesmo_com_manuais_presentes():
+    indicadores = dict(INDICADORES, notas_aguardando_lancamento=7, nf_pendente_faturamento=3, devolucao=1, scanner_documentos=4, intercompany=9)
+    novo_html, aplicados, _ = html_writer.atualizar_html(HTML_SINTETICO_COM_MANUAIS, indicadores)
+    linha_curva_abc_original = "{ n:17, title:'Curva ABC',                  value:'30',    yesterday:'30',    deltaPct:0,    dir:'flat', color:'purple', icon:'abcBars', spark:[30,30] },"
+    assert linha_curva_abc_original in novo_html
