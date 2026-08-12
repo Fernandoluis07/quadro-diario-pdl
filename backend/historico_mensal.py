@@ -7,8 +7,11 @@ Ordem/Centro custo nenhum) — precisa voltar na linha crua da MB51:
 
 - Valor Total Atendido/Recebido/Estornado (R$) — soma de "Montante em MI", não existe nos JSONs
   diários (que só contam linha).
-- Ordens x Reservas e Top 5 Centro de Custo — dependem das colunas "Ordem"/"Centro custo", que
-  os agregados diários nunca leram.
+- Ordens x Reservas (+ "Outros" = nem Ordem nem Centro custo preenchidos) e Top 5 Centro de
+  Custo — dependem das colunas "Ordem"/"Centro custo", que os agregados diários nunca leram.
+  "Outros" é dinâmico por natureza (testa ausência dos 2 campos em cima de df_atend, o mesmo
+  conjunto de linhas de Reservas/Ordens) — cobre qualquer BWART de atendimento, inclusive um
+  tipo novo que apareça no futuro, sem precisar de lista fixa.
 - Notas Recebidas — dedup de Referência no MÊS INTEIRO (não é a soma de dedups diários, que
   daria um número diferente se a mesma nota aparecesse em mais de um dia).
 
@@ -79,6 +82,7 @@ def _calcular_mes(
     df_atend = df_mes.loc[df_mes["_bwart_norm"].isin(config.BWART_ATENDIMENTO)]
     reservas_mes = int(_preenchido(df_atend["Centro custo"]).sum())
     ordens_mes = int(_preenchido(df_atend["Ordem"]).sum())
+    outros_mes = int((~_preenchido(df_atend["Centro custo"]) & ~_preenchido(df_atend["Ordem"])).sum())
     centro_preenchido = df_atend.loc[_preenchido(df_atend["Centro custo"]), "Centro custo"].astype(str).str.strip()
     top5_centro_custo = [
         {"centro_custo": centro, "qtd": int(qtd)} for centro, qtd in centro_preenchido.value_counts().head(5).items()
@@ -102,6 +106,7 @@ def _calcular_mes(
         "valor_atendido_mes": _soma_valor(df_atend),
         "reservas_mes": reservas_mes,
         "ordens_mes": ordens_mes,
+        "outros_mes": outros_mes,
         "top5_centro_custo": top5_centro_custo,
         "notas_recebidas_mes": int(df_receb["Referência"].nunique()),
         "valor_recebido_mes": _soma_valor(df_receb),

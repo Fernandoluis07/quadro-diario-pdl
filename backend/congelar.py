@@ -1,9 +1,14 @@
-r"""Congela um dia calculado pelo Cabeçalho: grava nos 4 JSON de histórico do repo
+r"""Congela um dia calculado pelo Cabeçalho: grava nos 5 JSON de histórico do repo
 (historico_mb51.json, historico_manuais.json, historico_zmm028.json,
-historico_mensal.json) e atualiza o index.html na MESMA passada — tanto os
-`value:'...'` dos cards do dia corrente quanto as constantes `HISTORICO_*` embutidas
-e os painéis estáticos da tela Início (Pontos de Atenção / Avisos Importantes / Datas
-Importantes).
+historico_mensal.json, historico_paineis.json) e atualiza o index.html na MESMA
+passada — tanto os `value:'...'` dos cards do dia corrente quanto as constantes
+`HISTORICO_*` embutidas e os painéis estáticos da tela Início (Pontos de Atenção /
+Avisos Importantes / Datas Importantes).
+
+historico_paineis.json/HISTORICO_PAINEIS é o único dos 5 que também alimenta a tela
+Calendário (via `HISTORICO_PAINEIS[data]` no JS) — os outros 4 são só pros cards. Os
+painéis da tela Início continuam vindo do HTML estático (atualizar_painel_*, abaixo),
+sem depender dessa constante.
 
 As duas cópias (JSON solto no repo + constante embutida no index.html) precisam
 ficar sempre em sincronia: o index.html NÃO usa fetch() pra ler os JSON soltos (roda
@@ -87,6 +92,42 @@ def montar_entrada_zmm028(indicadores: dict) -> dict:
     return {campo: indicadores[campo] for campo in CAMPOS_ZMM028}
 
 
+def _classe_status(status: str) -> str:
+    return _STATUS_CLASSE.get(sem_acento_maiusculo(status), "scheduled")
+
+
+def _formatar_periodo(inicio: datetime.date, fim: datetime.date, duracao_dias: int | None) -> str:
+    texto = f"{inicio:%d/%m/%y} a {fim:%d/%m/%y}"
+    if duracao_dias is not None:
+        texto += f" · {duracao_dias} dias"
+    return texto
+
+
+def _serializar_data_importante(registro: dict) -> dict:
+    """Mesmo formato que o front-end já consome de PAINEIS_REAIS/HISTORICO_PAINEIS:
+    'name'/'period' sempre presentes, 'statusLabel'/'statusClasse' OMITIDOS quando o
+    Status da planilha está vazio (não inventa status pra quem não tem — ver Milton
+    Junior no congelamento retroativo original)."""
+    entrada = {
+        "name": registro["nome"],
+        "period": _formatar_periodo(registro["periodo_inicio"], registro["periodo_fim"], registro["duracao_dias"]),
+    }
+    if registro["status"]:
+        entrada["statusLabel"] = registro["status"]
+        entrada["statusClasse"] = _classe_status(registro["status"])
+    return entrada
+
+
+def montar_entrada_paineis(pontos_atencao: list[str], avisos_importantes: list[str], datas_importantes: list[dict]) -> dict:
+    """Snapshot do dia pros 3 painéis que a tela Calendário mostra pra data selecionada
+    — mesmo schema de HISTORICO_PAINEIS/PAINEIS_REAIS no index.html."""
+    return {
+        "pontos_atencao": list(pontos_atencao),
+        "avisos_importantes": list(avisos_importantes),
+        "datas_importantes": [_serializar_data_importante(r) for r in datas_importantes],
+    }
+
+
 def atualizar_historico_mensal(historico_mensal: dict, resumo_mes_novo: dict) -> dict:
     """Agregado mensal é sempre substituído pelo mês recalculado (não é congelamento
     diário — é um total corrente do mês, esperado mudar a cada dia até o mês fechar)."""
@@ -157,17 +198,6 @@ def atualizar_painel_pontos_avisos(html: str, pontos_atencao: list[str], avisos_
     return antes + secao + depois
 
 
-def _classe_status(status: str) -> str:
-    return _STATUS_CLASSE.get(sem_acento_maiusculo(status), "scheduled")
-
-
-def _formatar_periodo(inicio: datetime.date, fim: datetime.date, duracao_dias: int | None) -> str:
-    texto = f"{inicio:%d/%m/%y} a {fim:%d/%m/%y}"
-    if duracao_dias is not None:
-        texto += f" · {duracao_dias} dias"
-    return texto
-
-
 def _linha_vacation(registro: dict) -> str:
     classe = _classe_status(registro["status"])
     periodo = _formatar_periodo(registro["periodo_inicio"], registro["periodo_fim"], registro["duracao_dias"])
@@ -219,11 +249,13 @@ def congelar_dia(
     caminho_manuais_json = os.path.join(repo_root, "historico_manuais.json")
     caminho_zmm028_json = os.path.join(repo_root, "historico_zmm028.json")
     caminho_mensal_json = os.path.join(repo_root, "historico_mensal.json")
+    caminho_paineis_json = os.path.join(repo_root, "historico_paineis.json")
 
     historico_mb51 = _carregar_json(caminho_mb51_json)
     historico_manuais = _carregar_json(caminho_manuais_json)
     historico_zmm028 = _carregar_json(caminho_zmm028_json)
     historico_mensal = _carregar_json(caminho_mensal_json)
+    historico_paineis = _carregar_json(caminho_paineis_json)
 
     if ja_congelado(historico_mb51, data_iso) and not forcar:
         raise DiaJaCongeladoError(f"O dia {data_iso} já tinha sido congelado antes — nada foi alterado.")
@@ -233,6 +265,7 @@ def congelar_dia(
     entrada_mb51 = montar_entrada_mb51(indicadores, intercompany_manual)
     entrada_manual = montar_entrada_manual(indicadores, manual_hoje)
     entrada_zmm028 = montar_entrada_zmm028(indicadores)
+    entrada_paineis = montar_entrada_paineis(pontos_atencao, avisos_importantes, datas_importantes)
 
     data_ontem_iso = indicadores.get("data_referencia_ontem")
     ontem_manual = historico_manuais.get(data_ontem_iso) if data_ontem_iso else None
@@ -243,11 +276,13 @@ def congelar_dia(
     historico_manuais = {**historico_manuais, data_iso: entrada_manual}
     historico_zmm028 = {**historico_zmm028, data_iso: entrada_zmm028}
     historico_mensal = atualizar_historico_mensal(historico_mensal, resumo_mes)
+    historico_paineis = {**historico_paineis, data_iso: entrada_paineis}
 
     _salvar_json(caminho_mb51_json, historico_mb51)
     _salvar_json(caminho_manuais_json, historico_manuais)
     _salvar_json(caminho_zmm028_json, historico_zmm028)
     _salvar_json(caminho_mensal_json, historico_mensal)
+    _salvar_json(caminho_paineis_json, historico_paineis)
 
     with open(index_path, "r", encoding="utf-8") as f:
         html_atual = f.read()
@@ -269,6 +304,7 @@ def congelar_dia(
     html_novo = atualizar_constante_historico_js(html_novo, "HISTORICO_MANUAL", historico_manuais)
     html_novo = atualizar_constante_historico_js(html_novo, "HISTORICO_ZMM028", historico_zmm028)
     html_novo = atualizar_constante_historico_js(html_novo, "HISTORICO_MENSAL", historico_mensal)
+    html_novo = atualizar_constante_historico_js(html_novo, "HISTORICO_PAINEIS", historico_paineis)
 
     html_novo = atualizar_painel_pontos_avisos(html_novo, pontos_atencao, avisos_importantes)
     html_novo = atualizar_painel_datas_importantes(html_novo, datas_importantes)
@@ -280,6 +316,8 @@ def congelar_dia(
         "data": data_iso,
         "cards_atualizados": aplicados,
         "cards_nao_encontrados": nao_encontrados,
-        "arquivos_json_atualizados": [caminho_mb51_json, caminho_manuais_json, caminho_zmm028_json, caminho_mensal_json],
+        "arquivos_json_atualizados": [
+            caminho_mb51_json, caminho_manuais_json, caminho_zmm028_json, caminho_mensal_json, caminho_paineis_json,
+        ],
         "index_html_atualizado": index_path,
     }

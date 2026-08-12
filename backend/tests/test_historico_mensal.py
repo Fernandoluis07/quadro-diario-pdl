@@ -55,6 +55,29 @@ def test_ordens_e_reservas_contam_presenca_independente(tmp_path):
     mes = resultado["2026-04"]
     assert mes["ordens_mes"] == 2
     assert mes["reservas_mes"] == 2
+    assert mes["outros_mes"] == 1  # "1004": nem ordem nem centro custo
+    # "1003" tem ordem E centro custo ao mesmo tempo (fixture propositalmente cobre esse caso) —
+    # conta nos 2, então a soma das 3 categorias aqui passa de linhas_atendidas_mes; ver teste
+    # dedicado abaixo (sem linha com os 2 campos) pra conferir a invariante de soma exata.
+
+
+def test_outros_mes_e_dinamico_nao_depende_de_bwart_especifico(tmp_path):
+    """'Outros' não é uma lista fixa de BWART (122/221/601/833) — é qualquer linha de
+    atendimento sem Ordem nem Centro custo, mesmo com um BWART comum como 921."""
+    bases_dir = _preparar_mb51(
+        tmp_path,
+        [
+            _linha("2001", "D009", 921, "01.04.2026", "NF-X", ordem=None, centro_custo=None),
+            _linha("2002", "D009", 921, "02.04.2026", "NF-Y", ordem="5001", centro_custo=None),
+        ],
+    )
+    resultado = historico_mensal.calcular_historico_mensal(
+        datetime.date(2026, 4, 1), datetime.date(2026, 4, 30), bases_dir=bases_dir
+    )
+    mes = resultado["2026-04"]
+    assert mes["outros_mes"] == 1
+    assert mes["ordens_mes"] == 1
+    assert mes["reservas_mes"] + mes["ordens_mes"] + mes["outros_mes"] == mes["linhas_atendidas_mes"]
 
 
 def test_top5_centro_custo_ordenado_do_maior_pro_menor_sem_outros(tmp_path):

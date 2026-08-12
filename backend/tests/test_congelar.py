@@ -91,6 +91,7 @@ const HISTORICO_MB51 = {"2026-08-09":{"linhas_atendidas_d009":10,"linhas_atendid
 const HISTORICO_MANUAL = {"2026-08-09":{"notas_aguardando_lancamento":1,"devolucao":0,"scanner_documentos":2,"nf_pendente_faturamento":0,"reservas_pendentes":5,"pendencias_atendimento_linhas":9}};
 const HISTORICO_ZMM028 = {"2026-08-09":{"itens_estoque_com_saldo":100,"itens_mrp_saldo_zero":5,"valor_estoque_total":1000.0,"itens_sem_endereco":0}};
 const HISTORICO_MENSAL = {"2026-08":{"linhas_atendidas_mes":10}};
+const HISTORICO_PAINEIS = {"2026-08-09":{"pontos_atencao":["Ponto velho"],"avisos_importantes":[],"datas_importantes":[]}};
 </script>
 </body></html>
 """
@@ -157,6 +158,9 @@ def _preparar_repo(tmp_path):
         }
     }), encoding="utf-8")
     (tmp_path / "historico_mensal.json").write_text(json.dumps({"2026-08": {"linhas_atendidas_mes": 10}}), encoding="utf-8")
+    (tmp_path / "historico_paineis.json").write_text(json.dumps({
+        "2026-08-09": {"pontos_atencao": ["Ponto velho"], "avisos_importantes": [], "datas_importantes": []},
+    }), encoding="utf-8")
 
     return str(tmp_path), str(index_path)
 
@@ -188,6 +192,22 @@ def test_montar_entrada_zmm028():
     assert entrada == {
         "itens_estoque_com_saldo": 5323, "itens_mrp_saldo_zero": 173,
         "valor_estoque_total": 28095123.45, "itens_sem_endereco": 1,
+    }
+
+
+def test_montar_entrada_paineis_omite_status_vazio():
+    registros = [
+        {"nome": "Ana Silva", "periodo_inicio": datetime.date(2026, 9, 1), "periodo_fim": datetime.date(2026, 9, 10), "duracao_dias": 10, "aprovacao": "OK", "status": "Programada"},
+        {"nome": "Milton Junior", "periodo_inicio": datetime.date(2026, 12, 28), "periodo_fim": datetime.date(2027, 1, 16), "duracao_dias": 20, "aprovacao": "", "status": ""},
+    ]
+    entrada = congelar.montar_entrada_paineis(["Ponto 1"], ["Aviso 1"], registros)
+    assert entrada == {
+        "pontos_atencao": ["Ponto 1"],
+        "avisos_importantes": ["Aviso 1"],
+        "datas_importantes": [
+            {"name": "Ana Silva", "period": "01/09/26 a 10/09/26 · 10 dias", "statusLabel": "Programada", "statusClasse": "scheduled"},
+            {"name": "Milton Junior", "period": "28/12/26 a 16/01/27 · 20 dias"},
+        ],
     }
 
 
@@ -247,7 +267,7 @@ def test_atualizar_painel_datas_importantes_regenera_linhas():
 
 # ---- congelar_dia fim a fim --------------------------------------------------
 
-def test_congelar_dia_grava_os_4_json_e_atualiza_index_html(tmp_path):
+def test_congelar_dia_grava_os_5_json_e_atualiza_index_html(tmp_path):
     repo_root, index_path = _preparar_repo(tmp_path)
 
     resultado = congelar.congelar_dia(
@@ -277,6 +297,10 @@ def test_congelar_dia_grava_os_4_json_e_atualiza_index_html(tmp_path):
     historico_mensal = json.loads((tmp_path / "historico_mensal.json").read_text(encoding="utf-8"))
     assert historico_mensal["2026-08"]["linhas_atendidas_mes"] == 999
 
+    historico_paineis = json.loads((tmp_path / "historico_paineis.json").read_text(encoding="utf-8"))
+    assert historico_paineis["2026-08-10"] == {"pontos_atencao": ["Ponto novo"], "avisos_importantes": ["Aviso novo"], "datas_importantes": []}
+    assert historico_paineis["2026-08-09"]["pontos_atencao"] == ["Ponto velho"]  # dia antigo intocado
+
     html_novo = (tmp_path / "index.html").read_text(encoding="utf-8")
     assert '"2026-08-10":{"linhas_atendidas_d009":116' in html_novo
     assert "title:'Linhas Atendidas D009',    value:'116'" in html_novo
@@ -284,6 +308,7 @@ def test_congelar_dia_grava_os_4_json_e_atualiza_index_html(tmp_path):
     assert "title:'Intercompany',            value:'2'" in html_novo
     assert "<li>Ponto novo</li>" in html_novo
     assert "{ n:17, title:'Curva ABC',                  value:'30',    yesterday:'30',    deltaPct:0,    dir:'flat', color:'yellow', icon:'abcBars', spark:[30,30] }," in html_novo
+    assert '"2026-08-10":{"pontos_atencao":["Ponto novo"],"avisos_importantes":["Aviso novo"],"datas_importantes":[]}' in html_novo
 
 
 def test_congelar_dia_recusa_sobrescrever_dia_ja_congelado(tmp_path):

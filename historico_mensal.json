@@ -30,7 +30,8 @@
     "valor_recebido_mes": 1196134.79,
     "inventario_rotativo_mes": 1304,
     "estornos_qtd_mes": 43,
-    "estornos_valor_mes": 35116.74
+    "estornos_valor_mes": 35116.74,
+    "outros_mes": 29
   },
   "2026-05": {
     "linhas_atendidas_mes": 1915,
@@ -63,7 +64,8 @@
     "valor_recebido_mes": 1190948.93,
     "inventario_rotativo_mes": 1448,
     "estornos_qtd_mes": 66,
-    "estornos_valor_mes": 124556.75
+    "estornos_valor_mes": 124556.75,
+    "outros_mes": 294
   },
   "2026-06": {
     "linhas_atendidas_mes": 2063,
@@ -96,7 +98,8 @@
     "valor_recebido_mes": 1089283.84,
     "inventario_rotativo_mes": 1673,
     "estornos_qtd_mes": 299,
-    "estornos_valor_mes": 745795.82
+    "estornos_valor_mes": 745795.82,
+    "outros_mes": 529
   },
   "2026-07": {
     "linhas_atendidas_mes": 1286,
@@ -129,7 +132,8 @@
     "valor_recebido_mes": 1110804.63,
     "inventario_rotativo_mes": 1334,
     "estornos_qtd_mes": 14,
-    "estornos_valor_mes": 340659.22
+    "estornos_valor_mes": 340659.22,
+    "outros_mes": 82
   },
   "2026-08": {
     "linhas_atendidas_mes": 611,
@@ -162,6 +166,7 @@
     "valor_recebido_mes": 707743.58,
     "inventario_rotativo_mes": 596,
     "estornos_qtd_mes": 8,
-    "estornos_valor_mes": 923.03
+    "estornos_valor_mes": 923.03,
+    "outros_mes": 47
   }
 }
