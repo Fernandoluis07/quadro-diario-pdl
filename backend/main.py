@@ -93,6 +93,7 @@ def calcular_todos_indicadores(
         "valor_estoque_total": indicadores.valor_estoque_total(zmm028),
         "itens_mrp_saldo_zero": indicadores.itens_mrp_saldo_zero(zmm028),
         "itens_sem_endereco": indicadores.itens_sem_endereco(zmm028),
+        "checklist_reservas": indicadores.montar_checklist_reservas(mb25, zmm028),
         "ontem": _calcular_bloco1(mb51, ontem) if ontem else None,
     }
     return resultado

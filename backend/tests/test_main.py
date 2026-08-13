@@ -31,7 +31,10 @@ def _preparar_bases(tmp_path):
             _linha_mb51("1004", "D009", 201, DIA3, "NF-D"),  # "hoje"
         ]
     )
-    mb25 = pd.DataFrame([{"Reserva": "R1", "Material": "2001", "Texto breve material": "x", "Depósito": "D009"}])
+    mb25 = pd.DataFrame(
+        [{"Reserva": "R1", "Material": "2001", "Texto breve material": "x", "Depósito": "D009",
+          "Qtd.necessária": None, "Data da necessidade": None, "Centro custo": None, "Ordem": None}]
+    )
     zmm028 = pd.DataFrame(
         [{"Material": "3001", "Denom.": "x", "Unidade": "UN", "Centro": "2003", "Util.livre": 1,
           "Val.total": 10.0, "Pos.dpst.": "A-01", "Tp.MRP": "VB", "Depósito": "D009",
@@ -48,6 +51,12 @@ def test_detecta_hoje_como_data_mais_recente_do_arquivo_sem_usar_relogio(tmp_pat
     resultado = main.calcular_todos_indicadores(bases_dir=bases_dir)
     assert resultado["data_referencia"] == "2026-08-05"
     assert resultado["linhas_atendidas_d009"] == 1  # só a linha do dia 3
+    assert resultado["checklist_reservas"] == [
+        {
+            "numero_reserva": "R1", "material": "2001", "descricao": "x", "data_necessidade": "",
+            "qtd_necessaria": 0.0, "centro_custo": "", "ordem": "", "saldo_atual": 0.0, "endereco": "",
+        }
+    ]
 
 
 def test_detecta_ontem_como_segunda_data_mais_recente(tmp_path):
@@ -72,7 +81,10 @@ def test_parametro_data_forca_hoje_manualmente_e_ontem_vira_a_data_anterior_no_a
 
 def test_sem_segunda_data_no_arquivo_ontem_fica_none(tmp_path):
     mb51 = pd.DataFrame([_linha_mb51("1001", "D009", 201, DIA3, "NF-D")])
-    mb25 = pd.DataFrame([{"Reserva": "R1", "Material": "2001", "Texto breve material": "x", "Depósito": "D009"}])
+    mb25 = pd.DataFrame(
+        [{"Reserva": "R1", "Material": "2001", "Texto breve material": "x", "Depósito": "D009",
+          "Qtd.necessária": None, "Data da necessidade": None, "Centro custo": None, "Ordem": None}]
+    )
     zmm028 = pd.DataFrame(
         [{"Material": "3001", "Denom.": "x", "Unidade": "UN", "Centro": "2003", "Util.livre": 1,
           "Val.total": 10.0, "Pos.dpst.": "A-01", "Tp.MRP": "VB", "Depósito": "D009",

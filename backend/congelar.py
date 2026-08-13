@@ -306,6 +306,14 @@ def congelar_dia(
     html_novo = atualizar_constante_historico_js(html_novo, "HISTORICO_MENSAL", historico_mensal)
     html_novo = atualizar_constante_historico_js(html_novo, "HISTORICO_PAINEIS", historico_paineis)
 
+    # Checklist de Reservas: fotografia atual (MB25 x ZMM028), não é histórico por
+    # data — não tem historico_*.json próprio, só vive nesta constante embutida,
+    # sempre sobrescrita a cada congelamento (mesmo raciocínio do comentário no
+    # topo do arquivo pra HISTORICO_PAINEIS vs painéis estáticos da tela Início).
+    html_novo = atualizar_constante_historico_js(
+        html_novo, "CHECKLIST_RESERVAS", {"rows": indicadores["checklist_reservas"]}
+    )
+
     html_novo = atualizar_painel_pontos_avisos(html_novo, pontos_atencao, avisos_importantes)
     html_novo = atualizar_painel_datas_importantes(html_novo, datas_importantes)
 

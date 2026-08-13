@@ -35,7 +35,8 @@ def _preparar_bases(tmp_path):
     mb51.to_excel(bases_dir / config.MB51_FILENAME, index=False)
 
     mb25 = pd.DataFrame(
-        [{"Reserva": "R10", "Material": "2001", "Texto breve material": "Item A", "Depósito": "D009"}]
+        [{"Reserva": "R10", "Material": "2001", "Texto breve material": "Item A", "Depósito": "D009",
+          "Qtd.necessária": 3, "Data da necessidade": "15/08/2026", "Centro custo": None, "Ordem": "O10"}]
     )
     mb25.to_excel(bases_dir / config.MB25_FILENAME, index=False)
 

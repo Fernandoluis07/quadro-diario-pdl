@@ -92,6 +92,7 @@ const HISTORICO_MANUAL = {"2026-08-09":{"notas_aguardando_lancamento":1,"devoluc
 const HISTORICO_ZMM028 = {"2026-08-09":{"itens_estoque_com_saldo":100,"itens_mrp_saldo_zero":5,"valor_estoque_total":1000.0,"itens_sem_endereco":0}};
 const HISTORICO_MENSAL = {"2026-08":{"linhas_atendidas_mes":10}};
 const HISTORICO_PAINEIS = {"2026-08-09":{"pontos_atencao":["Ponto velho"],"avisos_importantes":[],"datas_importantes":[]}};
+const CHECKLIST_RESERVAS = {"rows":[]};
 </script>
 </body></html>
 """
@@ -113,6 +114,10 @@ INDICADORES_HOJE = {
     "valor_estoque_total": 28095123.45,
     "itens_mrp_saldo_zero": 173,
     "itens_sem_endereco": 1,
+    "checklist_reservas": [
+        {"numero_reserva": "R1", "material": "100", "descricao": "Item A", "data_necessidade": "20/08/2026",
+         "qtd_necessaria": 5.0, "centro_custo": "", "ordem": "O1", "saldo_atual": 42.0, "endereco": "A-01"},
+    ],
     "ontem": {
         "linhas_atendidas_d009": 2, "linhas_atendidas_d016": 0,
         "estornos_d009": 0, "estornos_d016": 0,
@@ -309,6 +314,8 @@ def test_congelar_dia_grava_os_5_json_e_atualiza_index_html(tmp_path):
     assert "<li>Ponto novo</li>" in html_novo
     assert "{ n:17, title:'Curva ABC',                  value:'30',    yesterday:'30',    deltaPct:0,    dir:'flat', color:'yellow', icon:'abcBars', spark:[30,30] }," in html_novo
     assert '"2026-08-10":{"pontos_atencao":["Ponto novo"],"avisos_importantes":["Aviso novo"],"datas_importantes":[]}' in html_novo
+
+    assert '"rows":[{"numero_reserva":"R1","material":"100","descricao":"Item A","data_necessidade":"20/08/2026","qtd_necessaria":5.0,"centro_custo":"","ordem":"O1","saldo_atual":42.0,"endereco":"A-01"}]' in html_novo
 
 
 def test_congelar_dia_recusa_sobrescrever_dia_ja_congelado(tmp_path):

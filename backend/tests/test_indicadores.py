@@ -130,3 +130,75 @@ def test_itens_sem_endereco_exige_saldo_e_pos_dpst_vazia():
         }
     )
     assert indicadores.itens_sem_endereco(df) == 2
+
+
+def _mb25_checklist(rows):
+    base = {
+        "Reserva": "", "Material": "", "Texto breve material": "", "Depósito": "D009",
+        "Qtd.necessária": 0, "Data da necessidade": None, "Centro custo": None, "Ordem": "",
+    }
+    return pd.DataFrame([{**base, **r} for r in rows])
+
+
+def _zmm028_checklist(rows):
+    base = {"Material": "", "Util.livre": 0, "Pos.dpst.": None}
+    return pd.DataFrame([{**base, **r} for r in rows])
+
+
+def test_montar_checklist_reservas_cruza_por_material_e_ordena_por_endereco():
+    mb25 = _mb25_checklist(
+        [
+            {"Reserva": "R1", "Material": "100", "Texto breve material": "Item A", "Qtd.necessária": 5,
+             "Data da necessidade": datetime.date(2026, 8, 20), "Centro custo": 2003, "Ordem": "O1"},
+            {"Reserva": "R2", "Material": "200", "Texto breve material": "Item B", "Qtd.necessária": 3,
+             "Data da necessidade": datetime.date(2026, 8, 21), "Ordem": "O2"},
+        ]
+    )
+    zmm028 = _zmm028_checklist(
+        [
+            {"Material": "100", "Util.livre": 42, "Pos.dpst.": "0200105201"},
+            {"Material": "200", "Util.livre": 7, "Pos.dpst.": "0100101101"},
+        ]
+    )
+    linhas = indicadores.montar_checklist_reservas(mb25, zmm028)
+    assert [l["numero_reserva"] for l in linhas] == ["R2", "R1"]  # endereço 01... vem antes de 02...
+    assert linhas[0] == {
+        "numero_reserva": "R2", "material": "200", "descricao": "Item B",
+        "data_necessidade": "21/08/2026", "qtd_necessaria": 3.0, "centro_custo": "",
+        "ordem": "O2", "saldo_atual": 7.0, "endereco": "0100101101",
+    }
+    assert linhas[1]["centro_custo"] == "2003"
+
+
+def test_montar_checklist_reservas_mantem_linha_sem_material_no_zmm028():
+    mb25 = _mb25_checklist([{"Reserva": "R9", "Material": "999", "Texto breve material": "Sem estoque"}])
+    zmm028 = _zmm028_checklist([{"Material": "100", "Util.livre": 1, "Pos.dpst.": "A"}])
+    linhas = indicadores.montar_checklist_reservas(mb25, zmm028)
+    assert len(linhas) == 1
+    assert linhas[0]["saldo_atual"] == 0
+    assert linhas[0]["endereco"] == ""
+
+
+def test_montar_checklist_reservas_endereco_vazio_vai_para_o_final():
+    mb25 = _mb25_checklist(
+        [
+            {"Reserva": "R1", "Material": "1"},
+            {"Reserva": "R2", "Material": "2"},
+        ]
+    )
+    zmm028 = _zmm028_checklist(
+        [
+            {"Material": "1", "Pos.dpst.": None},
+            {"Material": "2", "Pos.dpst.": "Z-99"},
+        ]
+    )
+    linhas = indicadores.montar_checklist_reservas(mb25, zmm028)
+    assert [l["numero_reserva"] for l in linhas] == ["R2", "R1"]
+
+
+def test_montar_checklist_reservas_normaliza_material_com_sufixo_float():
+    mb25 = _mb25_checklist([{"Reserva": "R1", "Material": "1500022.0"}])
+    zmm028 = _zmm028_checklist([{"Material": "1500022", "Util.livre": 9, "Pos.dpst.": "A-01"}])
+    linhas = indicadores.montar_checklist_reservas(mb25, zmm028)
+    assert linhas[0]["material"] == "1500022"
+    assert linhas[0]["saldo_atual"] == 9.0

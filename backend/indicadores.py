@@ -109,3 +109,71 @@ def itens_sem_endereco(df_zmm028: pd.DataFrame) -> int:
     pos_dpst = df_zmm028["Pos.dpst."].astype(str).str.strip()
     pos_vazia = pos_dpst.eq("") | pos_dpst.eq("nan") | df_zmm028["Pos.dpst."].isna()
     return int(((_util_livre(df_zmm028) != 0) & pos_vazia).sum())
+
+
+# ---- Tela Checklist de Reservas (MB25 x ZMM028) -----------------------------
+# Não é um indicador agregado como os de cima — é a lista completa de linhas de
+# reserva pendente (uma por linha do MB25), enriquecida com Saldo Atual/Endereço
+# do ZMM028 via código do Material. Sempre a fotografia do dia corrente, sem
+# histórico por data (congelar.py grava só a constante embutida no HTML).
+
+def _texto_ou_vazio(serie: pd.Series) -> pd.Series:
+    """Vazio/NaN vira ''. Colunas de código (Centro custo, Ordem) que misturam
+    número com célula vazia sofrem upcast pra float64 no pandas (2003 -> 2003.0)
+    — desfaz esse sufixo pra não vazar '.0' num código que devia ser inteiro."""
+
+    def _formatar(v: object) -> str:
+        if pd.isna(v):
+            return ""
+        if isinstance(v, float) and v.is_integer():
+            return str(int(v))
+        return str(v).strip()
+
+    return serie.apply(_formatar)
+
+
+def _normalizar_material(serie: pd.Series) -> pd.Series:
+    """Material pode chegar como '1500022' ou '1500022.0' dependendo da
+    formatação da célula de origem — remove o sufixo antes de cruzar."""
+    texto = serie.astype(str).str.strip()
+    return texto.str.replace(r"\.0$", "", regex=True)
+
+
+def montar_checklist_reservas(df_mb25: pd.DataFrame, df_zmm028: pd.DataFrame) -> list[dict]:
+    """Cruza cada linha de reserva pendente (MB25, já filtrado D009+vazio) com o
+    Saldo Atual/Endereço do ZMM028 pelo código do Material. Reserva sem material
+    correspondente no ZMM028 não é descartada — Saldo/Endereço ficam vazios.
+    Ordenado por Endereço A-Z (linhas sem endereço vão para o final) pra apoiar
+    a conferência física andando pelo almoxarifado em sequência."""
+    esquerda = df_mb25.copy()
+    esquerda["_material_norm"] = _normalizar_material(esquerda["Material"])
+
+    direita = df_zmm028[["Material", "Util.livre", "Pos.dpst."]].copy()
+    direita["_material_norm"] = _normalizar_material(direita["Material"])
+    direita = direita.drop_duplicates(subset="_material_norm", keep="first")
+
+    cruzado = esquerda.merge(
+        direita[["_material_norm", "Util.livre", "Pos.dpst."]], on="_material_norm", how="left"
+    )
+
+    datas = pd.to_datetime(cruzado["Data da necessidade"], dayfirst=True, errors="coerce")
+
+    linhas = pd.DataFrame(
+        {
+            "numero_reserva": _texto_ou_vazio(cruzado["Reserva"]),
+            "material": cruzado["_material_norm"],
+            "descricao": _texto_ou_vazio(cruzado["Texto breve material"]),
+            "data_necessidade": datas.dt.strftime("%d/%m/%Y").fillna(""),
+            "qtd_necessaria": pd.to_numeric(cruzado["Qtd.necessária"], errors="coerce").fillna(0),
+            "centro_custo": _texto_ou_vazio(cruzado["Centro custo"]),
+            "ordem": _texto_ou_vazio(cruzado["Ordem"]),
+            "saldo_atual": pd.to_numeric(cruzado["Util.livre"], errors="coerce").fillna(0),
+            "endereco": _texto_ou_vazio(cruzado["Pos.dpst."]),
+        }
+    )
+
+    sem_endereco = linhas["endereco"].eq("")
+    linhas = linhas.assign(_sem_endereco=sem_endereco).sort_values(
+        by=["_sem_endereco", "endereco"], kind="stable"
+    )
+    return linhas.drop(columns="_sem_endereco").to_dict(orient="records")
