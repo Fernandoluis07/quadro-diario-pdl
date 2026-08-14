@@ -1064,11 +1064,19 @@
     "pendencias_atendimento_linhas": 87
   },
   "2026-08-12": {
-    "notas_aguardando_lancamento": 15,
-    "devolucao": 4,
+    "notas_aguardando_lancamento": 0,
+    "devolucao": 1,
     "scanner_documentos": 0,
-    "nf_pendente_faturamento": 3,
+    "nf_pendente_faturamento": 8,
     "reservas_pendentes": 37,
     "pendencias_atendimento_linhas": 79
+  },
+  "2026-08-13": {
+    "notas_aguardando_lancamento": 0,
+    "devolucao": 1,
+    "scanner_documentos": 0,
+    "nf_pendente_faturamento": 8,
+    "reservas_pendentes": 33,
+    "pendencias_atendimento_linhas": 64
   }
 }
