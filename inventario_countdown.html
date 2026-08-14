@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Inventário Geral PDL — Contagem Regressiva — Fernando Luis</title>
+<title>Inventário Geral PDL — Contagem Regressiva</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   html,body { width:100%; height:100%; background:#f7f5f0; font-family: Arial, Helvetica, sans-serif; overflow:hidden; }
@@ -92,6 +92,7 @@
     object-fit:contain;
     background:transparent;
   }
+
 </style>
 </head>
 <body>
@@ -168,7 +169,7 @@
 </div>
 
 <script>
-  var dataAlvo = new Date("2027-01-21T08:00:00");
+  var dataAlvo = new Date("2027-01-21T08:00:00-04:00"); // horário de Mato Grosso (UTC-4), travado independente do fuso do aparelho
 
   function atualizarCronometro() {
     var agora = new Date();
@@ -200,23 +201,15 @@
   // dentro desse retângulo, então nunca desalinham entre si, em nenhuma proporção de tela.
   function ajustarPalcoLimpeza() {
     var RAZAO = 1536 / 1024;
-
-    // clientWidth/clientHeight do <html> é mais confiável que window.innerWidth/innerHeight
-    // em navegadores embutidos/antigos (webviews de TV); innerWidth fica só de reserva.
     var vw = document.documentElement.clientWidth || window.innerWidth || 0;
     var vh = document.documentElement.clientHeight || window.innerHeight || 0;
-
-    // Se por algum motivo a tela ainda reportar 0 (layout não pronto), não aplica nada
-    // agora — a função vai rodar de novo em 'load' e 'resize' e se corrigir sozinha.
     if (!vw || !vh) return;
 
     var w, h;
     if (vw / vh > RAZAO) {
-      h = vh;
-      w = h * RAZAO;
+      h = vh; w = h * RAZAO;
     } else {
-      w = vw;
-      h = w / RAZAO;
+      w = vw; h = w / RAZAO;
     }
     var left = (vw - w) / 2;
     var top = (vh - h) / 2;
@@ -235,8 +228,8 @@
 
   var TEMPO_CRONOMETRO = 30000; // 30s
   // duração individual de cada slide, na mesma ordem do HTML acima:
-  // 1 Status Preparação, 2 Pré-Organização, 3 Padronização, 4 Antes e Depois, 5 Equipe em Ação, 6 Limpeza (vídeo)
-  var DURACOES_SLIDE = [5000, 5000, 5000, 5000, 5000, 10000];
+  // 1 Status Preparação (10s), 2 Pré-Organização, 3 Padronização, 4 Antes e Depois, 5 Equipe em Ação, 6 Limpeza (vídeo, 5s)
+  var DURACOES_SLIDE = [10000, 5000, 5000, 5000, 5000, 5000];
 
   var timerAtual = null;
 
@@ -250,15 +243,17 @@
     telaCronometro.classList.remove('escondida');
     videoLimpeza.pause();
     videoLimpeza.currentTime = 0;
+    // limpa o "ativo" de todos os slides agora, enquanto #tela-slides ainda está
+    // com opacity:0 (escondido) — evita que o slide anterior fique "de relance"
+    // brigando visualmente com o slide 1 quando o próximo ciclo começa a aparecer
+    slides.forEach(function(s){ s.classList.remove('ativo'); });
     timerAtual = setTimeout(iniciarSlideshow, TEMPO_CRONOMETRO);
   }
 
   function iniciarSlideshow() {
     telaCronometro.classList.add('escondida');
     telaSlides.classList.add('ativa');
-    var indice = 0;
-    slides.forEach(function(s){ s.classList.remove('ativo'); });
-    mostrarSlide(indice);
+    mostrarSlide(0);
   }
 
   function mostrarSlide(indice) {
