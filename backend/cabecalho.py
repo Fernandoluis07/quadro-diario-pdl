@@ -146,15 +146,24 @@ def subir_para_github(repo_root: str, data_iso: str) -> None:
     if r_add.returncode != 0:
         raise RuntimeError(f"git add falhou:\n{r_add.stderr}")
 
-    r_status = _git(repo_root, "status", "--porcelain")
-    if not r_status.stdout.strip():
-        print("Nada para commitar (working tree já limpo).")
+    # "--branch" traz uma 1ª linha tipo "## main...origin/main [ahead 1]" — sem ela,
+    # working tree limpa mas com commit local pendente de push (ex.: push anterior que
+    # falhou) fazia esta função desistir achando que não havia nada a fazer.
+    r_status = _git(repo_root, "status", "--porcelain", "--branch")
+    linhas = r_status.stdout.splitlines()
+    branch_linha = linhas[0] if linhas else ""
+    ha_mudancas = len(linhas) > 1
+    ha_commit_pendente_de_push = "[ahead" in branch_linha
+
+    if not ha_mudancas and not ha_commit_pendente_de_push:
+        print("Nada para commitar nem para subir (working tree já limpo e nada pendente de push).")
         return
 
-    r_commit = _git(repo_root, "commit", "-m", f"Congela dia {data_iso}")
-    if r_commit.returncode != 0:
-        raise RuntimeError(f"git commit falhou:\n{r_commit.stderr}")
-    print(r_commit.stdout.strip())
+    if ha_mudancas:
+        r_commit = _git(repo_root, "commit", "-m", f"Congela dia {data_iso}")
+        if r_commit.returncode != 0:
+            raise RuntimeError(f"git commit falhou:\n{r_commit.stderr}")
+        print(r_commit.stdout.strip())
 
     r_push = _git(repo_root, "push")
     if r_push.returncode != 0:
@@ -187,6 +196,23 @@ def executar(
     indicadores = calcular_todos_indicadores(bases_dir=bases_dir, data_ref=data_forcada)
     hoje = datetime.date.fromisoformat(indicadores["data_referencia"])
 
+    # Checa "já congelado?"/senha ANTES de mostrar qualquer resumo: uma senha errada
+    # tem que travar a execução imediatamente, sem imprimir nada que pareça sucesso
+    # (ver backend/cabecalho.py — bug diagnosticado 2026-08-12/13, resumo era
+    # mostrado antes da senha e por isso parecia ter funcionado mesmo quando não
+    # gravava nada).
+    caminho_mb51_json = os.path.join(REPO_ROOT, "historico_mb51.json")
+    forcar = False
+    if congelar.ja_congelado(congelar._carregar_json(caminho_mb51_json), hoje.isoformat()):
+        print(f"O dia {hoje:%d/%m/%Y} já tinha sido congelado antes.")
+        if not _confirmar("Quer forçar o reprocessamento mesmo assim?"):
+            print("Ok, nada foi alterado.")
+            return 0
+        if not _senha_forcar_correta():
+            print("Senha incorreta — o dia continua bloqueado, nada foi alterado.")
+            return 0
+        forcar = True
+
     manuais_planilha = planilha_manual.ler_indicadores_diarios(manual_path)
     manual_hoje = manuais_planilha.get(hoje.isoformat())
     if manual_hoje is None:
@@ -209,18 +235,6 @@ def executar(
     if not _confirmar("\nPosso congelar?"):
         print("Ok, nada foi alterado.")
         return 0
-
-    caminho_mb51_json = os.path.join(REPO_ROOT, "historico_mb51.json")
-    forcar = False
-    if congelar.ja_congelado(congelar._carregar_json(caminho_mb51_json), hoje.isoformat()):
-        print(f"O dia {hoje:%d/%m/%Y} já tinha sido congelado antes.")
-        if not _confirmar("Quer forçar o reprocessamento mesmo assim?"):
-            print("Ok, nada foi alterado.")
-            return 0
-        if not _senha_forcar_correta():
-            print("Senha incorreta — o dia continua bloqueado, nada foi alterado.")
-            return 0
-        forcar = True
 
     try:
         resultado = congelar.congelar_dia(

@@ -148,10 +148,9 @@ def test_executar_recusa_congelar_dia_ja_congelado(tmp_path, monkeypatch):
     index_path = _preparar_index(tmp_path)
     (tmp_path / "historico_mb51.json").write_text(json.dumps({"2026-08-10": {"linhas_atendidas_d009": 0}}), encoding="utf-8")
 
-    # "s" pra "Posso congelar?" e "n" pra "Quer forçar o reprocessamento?" — nunca
-    # chega a pedir senha.
-    respostas = iter(["s", "n"])
-    monkeypatch.setattr("builtins.input", lambda _: next(respostas))
+    # "n" pra "Quer forçar o reprocessamento?" — pergunta antes de qualquer resumo,
+    # então nem chega a perguntar "Posso congelar?" nem a pedir senha.
+    monkeypatch.setattr("builtins.input", lambda _: "n")
     codigo = cabecalho.executar(bases_dir=bases_dir, manual_path=manual_path, index_path=index_path)
 
     assert codigo == 0
@@ -165,9 +164,9 @@ def test_executar_recusa_forcar_com_senha_errada(tmp_path, monkeypatch):
     index_path = _preparar_index(tmp_path)
     (tmp_path / "historico_mb51.json").write_text(json.dumps({"2026-08-10": {"linhas_atendidas_d009": 0}}), encoding="utf-8")
 
-    # "s" pra "Posso congelar?", "s" pra "Quer forçar?" — senha errada barra o resto.
-    respostas = iter(["s", "s"])
-    monkeypatch.setattr("builtins.input", lambda _: next(respostas))
+    # "s" pra "Quer forçar?" — senha errada barra o resto antes de qualquer resumo
+    # ser mostrado (não chega a perguntar "Posso congelar?").
+    monkeypatch.setattr("builtins.input", lambda _: "s")
     monkeypatch.setattr(cabecalho.getpass, "getpass", lambda _: "senha-errada")
     codigo = cabecalho.executar(bases_dir=bases_dir, manual_path=manual_path, index_path=index_path)
 
@@ -185,7 +184,7 @@ def test_executar_forca_reprocessamento_com_senha_correta(tmp_path, monkeypatch)
     senha_teste = "senha-de-teste-123"
     monkeypatch.setattr(config, "SENHA_FORCAR_RECONGELAMENTO_SHA256", hashlib.sha256(senha_teste.encode("utf-8")).hexdigest())
 
-    # "s" pra "Posso congelar?", "s" pra "Quer forçar?", "n" pra "Posso subir pro GitHub?"
+    # "s" pra "Quer forçar?", "s" pra "Posso congelar?", "n" pra "Posso subir pro GitHub?"
     respostas = iter(["s", "s", "n"])
     monkeypatch.setattr("builtins.input", lambda _: next(respostas))
     monkeypatch.setattr(cabecalho.getpass, "getpass", lambda _: senha_teste)
@@ -220,6 +219,41 @@ def test_subir_para_github_faz_add_commit_push(tmp_path):
 
     log = subprocess.run(["git", "log", "-1", "--format=%s"], cwd=repo, capture_output=True, text=True, check=True)
     assert "Congela dia 2026-08-10" in log.stdout
+
+
+def test_subir_para_github_envia_commit_pendente_mesmo_sem_mudanca_nova(tmp_path, capsys):
+    """Reproduz o caso relatado por Fernando e Luiz: um "Congela dia ..." já commitado
+    localmente (ex.: push anterior pulado ou que falhou) tem que ser enviado na
+    próxima execução, mesmo que a working tree já esteja limpa e não haja nada novo
+    pra commitar hoje."""
+    remoto = tmp_path / "remoto.git"
+    subprocess.run(["git", "init", "--bare", str(remoto)], check=True, capture_output=True)
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "teste@example.com"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Teste"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "remote", "add", "origin", str(remoto)], cwd=repo, check=True, capture_output=True)
+    (repo / "arquivo.txt").write_text("inicial", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "inicial"], cwd=repo, check=True, capture_output=True)
+    branch = subprocess.run(["git", "branch", "--show-current"], cwd=repo, capture_output=True, text=True, check=True).stdout.strip()
+    subprocess.run(["git", "push", "-u", "origin", branch], cwd=repo, check=True, capture_output=True)
+
+    # commit local que nunca chegou a ser enviado ao remoto
+    (repo / "arquivo.txt").write_text("congelado ontem", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Congela dia 2026-08-13"], cwd=repo, check=True, capture_output=True)
+
+    # working tree já está limpa de novo — nada novo pra congelar hoje
+    cabecalho.subir_para_github(str(repo), "2026-08-14")
+
+    assert "Push concluído." in capsys.readouterr().out
+    log_remoto = subprocess.run(
+        ["git", "log", "-1", "--format=%s"], cwd=remoto, capture_output=True, text=True, check=True
+    )
+    assert "Congela dia 2026-08-13" in log_remoto.stdout
 
 
 def test_subir_para_github_nao_faz_nada_se_nao_ha_mudanca(tmp_path, capsys):
