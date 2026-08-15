@@ -333,7 +333,7 @@ def test_subir_para_github_faz_add_commit_push(tmp_path):
     subprocess.run(["git", "push", "-u", "origin", branch], cwd=repo, check=True, capture_output=True)
 
     (repo / "arquivo.txt").write_text("modificado", encoding="utf-8")
-    cabecalho.subir_para_github(str(repo), "2026-08-10")
+    cabecalho.subir_para_github(str(repo), "2026-08-10", [str(repo / "arquivo.txt")])
 
     log = subprocess.run(["git", "log", "-1", "--format=%s"], cwd=repo, capture_output=True, text=True, check=True)
     assert "Congela dia 2026-08-10" in log.stdout
@@ -365,7 +365,7 @@ def test_subir_para_github_envia_commit_pendente_mesmo_sem_mudanca_nova(tmp_path
     subprocess.run(["git", "commit", "-m", "Congela dia 2026-08-13"], cwd=repo, check=True, capture_output=True)
 
     # working tree já está limpa de novo — nada novo pra congelar hoje
-    cabecalho.subir_para_github(str(repo), "2026-08-14")
+    cabecalho.subir_para_github(str(repo), "2026-08-14", [str(repo / "arquivo.txt")])
 
     assert "Push concluído." in capsys.readouterr().out
     log_remoto = subprocess.run(
@@ -384,5 +384,45 @@ def test_subir_para_github_nao_faz_nada_se_nao_ha_mudanca(tmp_path, capsys):
     subprocess.run(["git", "add", "-A"], cwd=repo, check=True, capture_output=True)
     subprocess.run(["git", "commit", "-m", "inicial"], cwd=repo, check=True, capture_output=True)
 
-    cabecalho.subir_para_github(str(repo), "2026-08-10")
+    cabecalho.subir_para_github(str(repo), "2026-08-10", [str(repo / "arquivo.txt")])
     assert "Nada para commitar" in capsys.readouterr().out
+
+
+def test_subir_para_github_ignora_arquivo_estranho_solto_na_pasta_compartilhada(tmp_path, capsys):
+    """Reproduz o incidente real de 2026-08-14: a pasta é compartilhada por várias
+    pessoas ao mesmo tempo, e uma delas pode ter uma edição solta (não commitada)
+    em outro arquivo qualquer na hora em que este congelamento sobe. Só o que
+    congelar_dia() de fato escreveu pode entrar no commit."""
+    remoto = tmp_path / "remoto.git"
+    subprocess.run(["git", "init", "--bare", str(remoto)], check=True, capture_output=True)
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "teste@example.com"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Teste"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "remote", "add", "origin", str(remoto)], cwd=repo, check=True, capture_output=True)
+    (repo / "historico_mb51.json").write_text("{}", encoding="utf-8")
+    (repo / "arquivo_de_outra_pessoa.py").write_text("codigo em andamento", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "inicial"], cwd=repo, check=True, capture_output=True)
+    branch = subprocess.run(["git", "branch", "--show-current"], cwd=repo, capture_output=True, text=True, check=True).stdout.strip()
+    subprocess.run(["git", "push", "-u", "origin", branch], cwd=repo, check=True, capture_output=True)
+
+    # o congelamento de hoje só escreveu historico_mb51.json...
+    (repo / "historico_mb51.json").write_text('{"2026-08-14": {}}', encoding="utf-8")
+    # ...mas alguém deixou uma edição solta e não commitada em outro arquivo qualquer
+    (repo / "arquivo_de_outra_pessoa.py").write_text("edicao ainda nao commitada de outra pessoa", encoding="utf-8")
+
+    cabecalho.subir_para_github(str(repo), "2026-08-14", [str(repo / "historico_mb51.json")])
+
+    log = subprocess.run(
+        ["git", "show", "--stat", "--format=", "HEAD"], cwd=repo, capture_output=True, text=True, check=True
+    ).stdout
+    assert "historico_mb51.json" in log
+    assert "arquivo_de_outra_pessoa.py" not in log
+
+    # a edição solta da outra pessoa continua lá, intacta e não commitada
+    status = subprocess.run(["git", "status", "--porcelain"], cwd=repo, capture_output=True, text=True, check=True).stdout
+    assert "arquivo_de_outra_pessoa.py" in status
+    assert (repo / "arquivo_de_outra_pessoa.py").read_text(encoding="utf-8") == "edicao ainda nao commitada de outra pessoa"

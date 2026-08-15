@@ -23,7 +23,11 @@ Fluxo, com confirmação em cada etapa importante:
      correta (config.SENHA_FORCAR_RECONGELAMENTO_SHA256); sem a senha certa,
      continua bloqueado.
   6. Pergunta "Posso subir pro GitHub?".
-  7. Se sim, git add + commit + push.
+  7. Se sim, git add SÓ dos arquivos que este congelamento escreveu (nunca
+     "git add -A") + commit + push — esta pasta é compartilhada por várias
+     pessoas ao mesmo tempo, então "-A" pegaria qualquer coisa solta de outra
+     pessoa junto (já aconteceu: código e uma exclusão de arquivo de outra
+     pessoa foram parar num commit "Congela dia").
 
 Uso:
     python -m backend.cabecalho
@@ -216,15 +220,25 @@ def sincronizar_com_remoto(repo_root: str) -> str | None:
     return None
 
 
-def subir_para_github(repo_root: str, data_iso: str) -> None:
-    r_add = _git(repo_root, "add", "-A")
+def subir_para_github(repo_root: str, data_iso: str, arquivos: list[str]) -> None:
+    """`arquivos` tem que ser exatamente os caminhos que congelar_dia() escreveu
+    (resultado["arquivos_json_atualizados"] + [resultado["index_html_atualizado"]]) —
+    NUNCA "git add -A". Este repositório é uma pasta de rede compartilhada por várias
+    pessoas ao mesmo tempo (não clones separados); "git add -A" já comitou por engano
+    edição de código de outra pessoa e uma exclusão acidental de arquivo que estavam
+    soltas na pasta (2026-08-14). Adicionar só os arquivos que este congelamento de
+    fato escreveu evita isso, não importa o que mais esteja sujo na pasta.
+    """
+    r_add = _git(repo_root, "add", "--", *arquivos)
     if r_add.returncode != 0:
         raise RuntimeError(f"git add falhou:\n{r_add.stderr}")
 
     # "--branch" traz uma 1ª linha tipo "## main...origin/main [ahead 1]" — sem ela,
     # working tree limpa mas com commit local pendente de push (ex.: push anterior que
-    # falhou) fazia esta função desistir achando que não havia nada a fazer.
-    r_status = _git(repo_root, "status", "--porcelain", "--branch")
+    # falhou) fazia esta função desistir achando que não havia nada a fazer. O "--"
+    # restringe as linhas de arquivo aos `arquivos` do congelamento — não conta como
+    # mudança pendente algo que outra pessoa deixou sujo na pasta compartilhada.
+    r_status = _git(repo_root, "status", "--porcelain", "--branch", "--", *arquivos)
     linhas = r_status.stdout.splitlines()
     branch_linha = linhas[0] if linhas else ""
     ha_mudancas = len(linhas) > 1
@@ -235,7 +249,7 @@ def subir_para_github(repo_root: str, data_iso: str) -> None:
         return
 
     if ha_mudancas:
-        r_commit = _git(repo_root, "commit", "-m", f"Congela dia {data_iso}")
+        r_commit = _git(repo_root, "commit", "-m", f"Congela dia {data_iso}", "--", *arquivos)
         if r_commit.returncode != 0:
             raise RuntimeError(f"git commit falhou:\n{r_commit.stderr}")
         print(r_commit.stdout.strip())
@@ -342,8 +356,9 @@ def executar(
         print("Ok — as alterações ficaram salvas localmente. Suba manualmente quando quiser (git add/commit/push).")
         return 0
 
+    arquivos_congelados = resultado["arquivos_json_atualizados"] + [resultado["index_html_atualizado"]]
     try:
-        subir_para_github(REPO_ROOT, hoje.isoformat())
+        subir_para_github(REPO_ROOT, hoje.isoformat(), arquivos_congelados)
     except RuntimeError as e:
         print(f"ERRO ao subir pro GitHub:\n{e}")
         return 1
