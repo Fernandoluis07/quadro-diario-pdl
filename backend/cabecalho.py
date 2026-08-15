@@ -5,17 +5,25 @@ rede da empresa, lê as planilhas da pasta irmã "03. Bases" (config.BASES_DIR �
 backend/config.py).
 
 Fluxo, com confirmação em cada etapa importante:
-  1. Lê as 3 planilhas SAP (MB51.xlsx, MB25.xlsx, ZMM028.xlsx) + a
+  1. Sincroniza sozinho com o GitHub (git fetch) ANTES de qualquer outra coisa — várias
+     pessoas rodam o Cabeçalho em turnos diferentes sem se coordenar entre si, então
+     essa checagem tem que ser automática: se este computador está só atrasado, dá
+     "git pull --ff-only" sozinho; se o histórico divergiu (outra pessoa congelou algo
+     que este computador ainda não tem, ao mesmo tempo em que este computador tem algo
+     pendente de envio), bloqueia e pede intervenção manual — nunca tenta resolver
+     sozinho, porque o índice do site (index.html) tem linhas de até 150 mil
+     caracteres que git não consegue mesclar automaticamente.
+  2. Lê as 3 planilhas SAP (MB51.xlsx, MB25.xlsx, ZMM028.xlsx) + a
      planilha_manual_quadro_diario.xlsx da pasta "03. Bases" (ou --bases-dir/--manual).
-  2. Calcula os 20 indicadores + Resumo do Mês, reaproveitando main.py/indicadores.py/
+  3. Calcula os 20 indicadores + Resumo do Mês, reaproveitando main.py/indicadores.py/
      historico_mensal.py — não recalcula nada que já existe.
-  3. Mostra um resumo e pergunta "Posso congelar?".
-  4. Se sim, congela (backend/congelar.py) — um dia já congelado antes só é
+  4. Mostra um resumo e pergunta "Posso congelar?".
+  5. Se sim, congela (backend/congelar.py) — um dia já congelado antes só é
      sobrescrito se o usuário pedir reprocessamento forçado E digitar a senha
      correta (config.SENHA_FORCAR_RECONGELAMENTO_SHA256); sem a senha certa,
      continua bloqueado.
-  5. Pergunta "Posso subir pro GitHub?".
-  6. Se sim, git add + commit + push.
+  6. Pergunta "Posso subir pro GitHub?".
+  7. Se sim, git add + commit + push.
 
 Uso:
     python -m backend.cabecalho
@@ -141,6 +149,73 @@ def _git(repo_root: str, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run(["git", *args], cwd=repo_root, capture_output=True, text=True)
 
 
+def sincronizar_com_remoto(repo_root: str) -> str | None:
+    """Fetch automático (e pull se só está atrasado) ANTES de qualquer trabalho.
+
+    A checagem "esse dia já foi congelado?" em executar() só enxerga o
+    historico_mb51.json DESTE clone — se este computador não tiver puxado um commit
+    que outra pessoa já enviou de outra máquina, essa checagem fica cega e pode deixar
+    congelar o mesmo dia duas vezes. Com várias pessoas rodando isso em turnos sem se
+    falar, não dá pra depender de alguém lembrar de rodar "git pull" antes — por isso
+    isso roda sozinho, sempre, no início de executar().
+
+    Retorna None se seguiu em frente (sincronizado, ou não é um repositório git — caso
+    de testes isolados). Retorna uma mensagem de erro se precisar de intervenção
+    manual: histórico divergiu (outra pessoa congelou algo enquanto este computador
+    tinha algo pendente de envio) ou não foi possível falar com o GitHub. Nesses casos
+    NUNCA tenta resolver sozinho — index.html tem linhas de até 150 mil caracteres que
+    git não consegue mesclar automaticamente; forçar um merge/pull aqui arriscaria
+    sobrescrever o congelamento de outra pessoa.
+    """
+    if not os.path.isdir(os.path.join(repo_root, ".git")):
+        return None
+
+    r_fetch = _git(repo_root, "fetch", "origin")
+    if r_fetch.returncode != 0:
+        return (
+            "Não consegui verificar se este computador está atualizado com o GitHub "
+            f"(git fetch falhou):\n{r_fetch.stderr}\n"
+            "Não vou continuar sem essa checagem — ela existe pra nunca congelar por "
+            "cima do que outra pessoa já congelou em outro computador."
+        )
+
+    branch = _git(repo_root, "rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
+    r_contagem = _git(repo_root, "rev-list", "--left-right", "--count", f"origin/{branch}...HEAD")
+    if r_contagem.returncode != 0:
+        return None  # sem upstream configurado (ex.: repositório de teste) — não bloqueia
+
+    atras_str, na_frente_str = r_contagem.stdout.split()
+    atras, na_frente = int(atras_str), int(na_frente_str)
+
+    if atras and na_frente:
+        return (
+            f"O repositório divergiu do GitHub: este computador tem {na_frente} "
+            f"commit(s) local(is) ainda não enviado(s), e o GitHub tem {atras} "
+            "commit(s) que este computador não tem — provavelmente outra pessoa "
+            "congelou um dia enquanto este computador tinha algo pendente de envio. "
+            "Isso precisa ser resolvido manualmente por quem administra o "
+            "repositório antes de continuar."
+        )
+
+    if atras:
+        r_pull = _git(repo_root, "pull", "--ff-only", "origin", branch)
+        if r_pull.returncode != 0:
+            return (
+                "O GitHub tem commit(s) que este computador não tem, e não consegui "
+                f"atualizar sozinho (git pull --ff-only falhou):\n{r_pull.stderr}"
+            )
+        print(f"Repositório atualizado automaticamente com {atras} commit(s) novo(s) do GitHub.")
+
+    if na_frente:
+        print(
+            f"Aviso: este computador tem {na_frente} commit(s) local(is) ainda não "
+            "enviado(s) ao GitHub (de uma execução anterior). Serão enviados ao final "
+            "desta execução, se você confirmar o push."
+        )
+
+    return None
+
+
 def subir_para_github(repo_root: str, data_iso: str) -> None:
     r_add = _git(repo_root, "add", "-A")
     if r_add.returncode != 0:
@@ -184,6 +259,11 @@ def executar(
     print("=== Cabeçalho — Quadro Diário PDL ===")
     print(f"Planilhas SAP: {bases_dir}")
     print(f"Planilha manual: {manual_path}\n")
+
+    erro_sync = sincronizar_com_remoto(REPO_ROOT)
+    if erro_sync:
+        print(f"ERRO — {erro_sync}")
+        return 1
 
     faltando = _checar_arquivos(bases_dir, manual_path)
     if faltando:

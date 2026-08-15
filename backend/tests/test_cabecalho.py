@@ -196,6 +196,124 @@ def test_executar_forca_reprocessamento_com_senha_correta(tmp_path, monkeypatch)
     assert historico["2026-08-10"] != {"linhas_atendidas_d009": 0}
 
 
+# ---- sincronização automática com o GitHub, no início de executar() -------
+
+def _preparar_repo_sincronizado(tmp_path):
+    """Inicializa tmp_path (== REPO_ROOT do teste, via _isolar_repo_root) como repo git
+    com origin apontando pra um bare remoto, já sincronizado (1 commit inicial
+    enviado). Retorna o path do bare remoto."""
+    remoto = tmp_path.parent / f"{tmp_path.name}_remoto.git"
+    subprocess.run(["git", "init", "--bare", str(remoto)], check=True, capture_output=True)
+
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "teste@example.com"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Teste"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "remote", "add", "origin", str(remoto)], cwd=tmp_path, check=True, capture_output=True)
+    (tmp_path / "README.txt").write_text("inicial", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "inicial"], cwd=tmp_path, check=True, capture_output=True)
+    branch = subprocess.run(["git", "branch", "--show-current"], cwd=tmp_path, capture_output=True, text=True, check=True).stdout.strip()
+    subprocess.run(["git", "push", "-u", "origin", branch], cwd=tmp_path, check=True, capture_output=True)
+    return remoto
+
+
+def _empurrar_commit_de_outro_computador(remoto, tmp_path, nome_arquivo, conteudo, mensagem):
+    """Simula outra máquina clonando o mesmo remoto, commitando e enviando — sem
+    passar pelo clone local em tmp_path, pra reproduzir "outra pessoa congelou em
+    outro computador sem este saber"."""
+    outro = tmp_path.parent / f"{tmp_path.name}_outro_pc"
+    subprocess.run(["git", "clone", str(remoto), str(outro)], check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "teste@example.com"], cwd=outro, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Teste"], cwd=outro, check=True, capture_output=True)
+    (outro / nome_arquivo).write_text(conteudo, encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=outro, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", mensagem], cwd=outro, check=True, capture_output=True)
+    subprocess.run(["git", "push"], cwd=outro, check=True, capture_output=True)
+
+
+def test_executar_atualiza_sozinho_quando_esta_atras_do_remoto(tmp_path, monkeypatch, capsys):
+    """Outro computador já congelou e enviou um dia; este computador nunca deu
+    git pull. executar() tem que se atualizar sozinho (fast-forward), sem pedir
+    nada pra ninguém, senão a checagem local de "já congelado?" ficaria cega pro
+    que já existe no GitHub."""
+    remoto = _preparar_repo_sincronizado(tmp_path)
+    bases_dir, manual_path = _preparar_bases(tmp_path)
+    index_path = _preparar_index(tmp_path)
+
+    _empurrar_commit_de_outro_computador(remoto, tmp_path, "outro.txt", "outro dia", "Congela dia 2026-08-09")
+
+    monkeypatch.setattr("builtins.input", lambda _: "n")  # recusa "Posso congelar?"
+    codigo = cabecalho.executar(bases_dir=bases_dir, manual_path=manual_path, index_path=index_path)
+
+    saida = capsys.readouterr().out
+    assert codigo == 0
+    assert "Repositório atualizado automaticamente com 1 commit(s)" in saida
+    assert (tmp_path / "outro.txt").exists()
+
+
+def test_executar_avisa_mas_nao_bloqueia_quando_esta_a_frente_do_remoto(tmp_path, monkeypatch, capsys):
+    """Este computador tem um commit local pendente de envio (ex.: "Congela dia" de
+    uma execução anterior) mas o remoto não mudou — não é motivo pra bloquear, só
+    pra avisar; o push acontece normalmente ao final se o usuário confirmar."""
+    _preparar_repo_sincronizado(tmp_path)
+
+    (tmp_path / "pendente.txt").write_text("commit nao enviado", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Congela dia 2026-08-13"], cwd=tmp_path, check=True, capture_output=True)
+
+    bases_dir, manual_path = _preparar_bases(tmp_path)
+    index_path = _preparar_index(tmp_path)
+
+    monkeypatch.setattr("builtins.input", lambda _: "n")  # recusa "Posso congelar?"
+    codigo = cabecalho.executar(bases_dir=bases_dir, manual_path=manual_path, index_path=index_path)
+
+    saida = capsys.readouterr().out
+    assert codigo == 0
+    assert "Aviso: este computador tem 1 commit(s) local(is) ainda não enviado(s)" in saida
+
+    log_local = subprocess.run(
+        ["git", "log", "-1", "--format=%s"], cwd=tmp_path, capture_output=True, text=True, check=True
+    ).stdout
+    assert "Congela dia 2026-08-13" in log_local
+
+
+def test_executar_bloqueia_quando_diverge_do_remoto(tmp_path, monkeypatch, capsys):
+    """Outra pessoa congelou e enviou um dia em outro computador, ENQUANTO este
+    computador também tinha um commit local pendente de envio — histórico
+    divergiu dos dois lados. index.html tem linhas de até 150 mil caracteres que
+    git não mescla automaticamente, então isso tem que bloquear e pedir
+    intervenção manual, nunca tentar resolver sozinho."""
+    remoto = _preparar_repo_sincronizado(tmp_path)
+
+    _empurrar_commit_de_outro_computador(remoto, tmp_path, "outro.txt", "outro dia", "Congela dia 2026-08-13")
+
+    (tmp_path / "local.txt").write_text("dia daqui", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Congela dia 2026-08-14"], cwd=tmp_path, check=True, capture_output=True)
+
+    monkeypatch.setattr("builtins.input", lambda _: pytest.fail("não deveria pedir nada — tem que bloquear antes"))
+    codigo = cabecalho.executar()
+
+    assert codigo == 1
+    assert "divergiu" in capsys.readouterr().out
+
+
+def test_executar_bloqueia_quando_fetch_falha(tmp_path, monkeypatch, capsys):
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "teste@example.com"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Teste"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "remote", "add", "origin", str(tmp_path / "remoto-inexistente")], cwd=tmp_path, check=True, capture_output=True)
+    (tmp_path / "arquivo.txt").write_text("x", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "inicial"], cwd=tmp_path, check=True, capture_output=True)
+
+    monkeypatch.setattr("builtins.input", lambda _: pytest.fail("não deveria pedir nada — tem que bloquear antes"))
+    codigo = cabecalho.executar()
+
+    assert codigo == 1
+    assert "git fetch falhou" in capsys.readouterr().out
+
+
 # ---- git ------------------------------------------------------------------
 
 def test_subir_para_github_faz_add_commit_push(tmp_path):
