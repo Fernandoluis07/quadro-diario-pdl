@@ -7277,11 +7277,12 @@
   "2026-08-14": {
     "pontos_atencao": [
       "Estorno de materiais para o estoque, somente com chamado aprovado.",
-      "Teste Luiz Subir Base"
+      "Teste Luiz Subir"
     ],
     "avisos_importantes": [
       "Todos os estornos devem ser feitos na data de hoje, não retroativa.",
-      "Git precisa estar instalado no computador antes de subir a base pro GitHub.  ( git-scm.com)"
+      "Git precisa estar instalado no computador antes de subir a base pro GitHub.  ( git-scm.com)",
+      "LUIZ SERGIO"
     ],
     "datas_importantes": [
       {
