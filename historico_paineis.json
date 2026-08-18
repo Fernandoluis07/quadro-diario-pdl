@@ -7322,5 +7322,52 @@
         "statusClasse": "scheduled"
       }
     ]
+  },
+  "2026-08-17": {
+    "pontos_atencao": [
+      "Estorno de materiais para o estoque, somente com chamado aprovado."
+    ],
+    "avisos_importantes": [
+      "Todos os estornos devem ser feitos na data de hoje, não retroativa.",
+      "Git precisa estar instalado no computador antes de subir a base pro GitHub.  ( git-scm.com)"
+    ],
+    "datas_importantes": [
+      {
+        "name": "Luiz Sergio",
+        "period": "23/03/26 a 05/04/26 · 14 dias",
+        "statusLabel": "Quitada",
+        "statusClasse": "done"
+      },
+      {
+        "name": "Geovane Abreu",
+        "period": "10/08/26 a 16/08/26 · 6 dias",
+        "statusLabel": "Quitada",
+        "statusClasse": "done"
+      },
+      {
+        "name": "Fernando Luis",
+        "period": "17/08/26 a 05/09/26 · 20 dias",
+        "statusLabel": "Programada",
+        "statusClasse": "scheduled"
+      },
+      {
+        "name": "Luiz Sergio",
+        "period": "14/09/26 a 29/09/26 · 16 dias",
+        "statusLabel": "Programada",
+        "statusClasse": "scheduled"
+      },
+      {
+        "name": "Geovane Abreu",
+        "period": "04/01/27 a 27/01/27 · 24 dias",
+        "statusLabel": "Programada",
+        "statusClasse": "scheduled"
+      },
+      {
+        "name": "Milton Junior",
+        "period": "28/12/26 a 16/01/27 · 20 dias",
+        "statusLabel": "Programada",
+        "statusClasse": "scheduled"
+      }
+    ]
   }
 }

@@ -808,5 +808,11 @@
     "itens_mrp_saldo_zero": 170,
     "valor_estoque_total": 28361234.88,
     "itens_sem_endereco": 0
+  },
+  "2026-08-17": {
+    "itens_estoque_com_saldo": 5325,
+    "itens_mrp_saldo_zero": 171,
+    "valor_estoque_total": 28225233.99,
+    "itens_sem_endereco": 0
   }
 }
