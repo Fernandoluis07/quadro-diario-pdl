@@ -825,6 +825,13 @@
     "itens_estoque_com_saldo": 5317,
     "itens_mrp_saldo_zero": 187,
     "valor_estoque_total": 28102818.01,
-    "itens_sem_endereco": 0
+    "itens_sem_endereco": 0,
+    "total_materiais_vb_d009": 2817,
+    "materiais_abaixo_estoque_minimo_qtd": 324,
+    "materiais_abaixo_estoque_minimo_valor_total": -1283766.83,
+    "materiais_abaixo_estoque_minimo_pct_valor_vb": 8.01,
+    "materiais_acima_estoque_maximo_qtd": 1267,
+    "materiais_acima_estoque_maximo_valor_total": 4566687.88,
+    "materiais_acima_estoque_maximo_pct_valor_vb": 28.48
   }
 }
