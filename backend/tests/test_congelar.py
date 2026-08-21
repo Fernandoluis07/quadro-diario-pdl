@@ -94,6 +94,9 @@ const HISTORICO_MENSAL = {"2026-08":{"linhas_atendidas_mes":10}};
 const HISTORICO_PAINEIS = {"2026-08-09":{"pontos_atencao":["Ponto velho"],"avisos_importantes":[],"datas_importantes":[]}};
 const CHECKLIST_RESERVAS = {"rows":[]};
 const CLASSIFICACAO_MRP = {"total":0,"itens":[]};
+const MATERIAIS_ABAIXO_MINIMO = {"itens":[]};
+const MATERIAIS_ACIMA_MAXIMO = {"itens":[]};
+const MATERIAIS_NUNCA_MOVIMENTADOS = {"itens":[]};
 </script>
 </body></html>
 """
@@ -122,6 +125,25 @@ INDICADORES_HOJE = {
     "materiais_acima_estoque_maximo_qtd": 278,
     "materiais_acima_estoque_maximo_valor_total": 2873420.55,
     "materiais_acima_estoque_maximo_pct_valor_vb": 3.44,
+    "materiais_abaixo_estoque_minimo_itens": [
+        {"material": "100245", "descricao": "Garrafa 500ml", "unidade": "UN", "classe": "VB",
+         "saldo_atual": 9.0, "pt_reabast": 15.0, "estoque_maximo": 400.0,
+         "quantidade": -6.0, "valor": -73.0, "endereco": "A-01"},
+    ],
+    "materiais_acima_estoque_maximo_itens": [
+        {"material": "100381", "descricao": "Tampa rosca 28mm", "unidade": "UN", "classe": "VB",
+         "saldo_atual": 60.0, "pt_reabast": 5.0, "estoque_maximo": 50.0,
+         "quantidade": 10.0, "valor": 120.0, "endereco": "B-02"},
+    ],
+    "materiais_nunca_movimentados_qtd": 325,
+    "materiais_nunca_movimentados_valor_total": 458210.30,
+    "materiais_nunca_movimentados_pct_valor_vb": 2.37,
+    "materiais_nunca_movimentados_pct_distribuicao": 6.50,
+    "materiais_nunca_movimentados_itens": [
+        {"material": "100512", "descricao": "Rótulo principal", "unidade": "UN", "classe": "VB",
+         "quantidade": 200.0, "endereco": "C-03", "valor": 2000.0,
+         "data_entrada": "2022-03-01", "tempo_parado": "4 anos e 5 meses"},
+    ],
     "classificacao_mrp": {
         "total": 3052,
         "itens": [
@@ -221,6 +243,10 @@ def test_montar_entrada_zmm028():
         "materiais_acima_estoque_maximo_qtd": 278,
         "materiais_acima_estoque_maximo_valor_total": 2873420.55,
         "materiais_acima_estoque_maximo_pct_valor_vb": 3.44,
+        "materiais_nunca_movimentados_qtd": 325,
+        "materiais_nunca_movimentados_valor_total": 458210.30,
+        "materiais_nunca_movimentados_pct_valor_vb": 2.37,
+        "materiais_nunca_movimentados_pct_distribuicao": 6.50,
     }
 
 
@@ -342,6 +368,9 @@ def test_congelar_dia_grava_os_5_json_e_atualiza_index_html(tmp_path):
     assert '"rows":[{"numero_reserva":"R1","material":"100","descricao":"Item A","data_necessidade":"20/08/2026","qtd_necessaria":5.0,"centro_custo":"","ordem":"O1","saldo_atual":42.0,"endereco":"A-01"}]' in html_novo
     assert '"materiais_abaixo_estoque_minimo_qtd":342' in html_novo
     assert 'const CLASSIFICACAO_MRP = {"itens":[{"classe":"VB","qtd":1258,"valor_total":4258650.45}' in html_novo
+    assert 'const MATERIAIS_ABAIXO_MINIMO = {"itens":[{"material":"100245"' in html_novo
+    assert 'const MATERIAIS_ACIMA_MAXIMO = {"itens":[{"material":"100381"' in html_novo
+    assert 'const MATERIAIS_NUNCA_MOVIMENTADOS = {"itens":[{"material":"100512"' in html_novo
 
 
 def test_congelar_dia_recusa_sobrescrever_dia_ja_congelado(tmp_path):

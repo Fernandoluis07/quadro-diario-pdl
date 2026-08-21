@@ -163,6 +163,37 @@ def materiais_vb_sem_preco_mm60(df_zmm028_d009: pd.DataFrame, df_mm60: pd.DataFr
     return sorted(faltando.unique().tolist())
 
 
+def _montar_itens_gap(subset: pd.DataFrame, quantidade: pd.Series, mapa_preco: pd.Series, sinal: int) -> list[dict]:
+    """Lista detalhada (exportação) dos indicadores 1/2 — mesmas colunas nos dois,
+    só muda o sinal de Quantidade/Valor (`sinal` +1/-1; `quantidade` já vem em
+    módulo/positiva). Material sem preço cadastrado na MM60 fica com Valor = None
+    (não 0 — 0 pareceria um preço real conhecido; a MM60 é fonte única, sem
+    estimativa automática quando falta, ver materiais_vb_sem_preco_mm60)."""
+    materiais_norm = _normalizar_material(subset["Material"])
+    preco = materiais_norm.map(mapa_preco)  # NaN = sem preço na MM60
+    valor = quantidade * preco * sinal
+
+    tabela = pd.DataFrame(
+        {
+            "material": materiais_norm,
+            "descricao": subset["Denom."].astype(str).str.strip(),
+            "unidade": subset["Unidade"].astype(str).str.strip(),
+            "classe": subset["Tp.MRP"].astype(str).str.strip(),
+            "saldo_atual": _util_livre(subset).round(2),
+            "pt_reabast": pd.to_numeric(subset["Pt.reabast"], errors="coerce").fillna(0).round(2),
+            "estoque_maximo": pd.to_numeric(subset["Estq.máx."], errors="coerce").fillna(0).round(2),
+            "quantidade": (quantidade * sinal).round(2),
+            "valor": valor.round(2),
+            "endereco": subset["Pos.dpst."].astype(str).str.strip(),
+        }
+    )
+    registros = tabela.to_dict(orient="records")
+    for r in registros:
+        if pd.isna(r["valor"]):
+            r["valor"] = None
+    return registros
+
+
 def materiais_abaixo_estoque_minimo(
     df_zmm028_d009: pd.DataFrame, df_mm60: pd.DataFrame, valor_total_vb: float
 ) -> dict:
@@ -172,7 +203,9 @@ def materiais_abaixo_estoque_minimo(
     (MM60), sempre NEGATIVO (representa o déficit/quanto falta comprar).
     `valor_total_vb` (Val.total somado dos materiais VB, ver resumo_vb) é o
     denominador do percentual — passado de fora pra ser a MESMA base usada pelo
-    indicador 2, calculada uma única vez."""
+    indicador 2, calculada uma única vez. `itens`: lista detalhada pra exportação
+    (Código/Descrição/Unidade/Classificação/Saldo/Pt.reabast/Estq.máx./Quantidade
+    negativa/Valor negativo/Endereço)."""
     tp_mrp = df_zmm028_d009["Tp.MRP"].astype(str).str.strip()
     vb = df_zmm028_d009.loc[tp_mrp == "VB"]
 
@@ -181,7 +214,8 @@ def materiais_abaixo_estoque_minimo(
     abaixo = vb.loc[util_livre < pt_reabast]
 
     gap = pt_reabast.loc[abaixo.index] - util_livre.loc[abaixo.index]
-    preco = _juntar_preco(abaixo, _mapa_preco_medio(df_mm60))
+    mapa_preco = _mapa_preco_medio(df_mm60)
+    preco = _juntar_preco(abaixo, mapa_preco)
     valor_gap = float((gap * preco).sum())
 
     pct_valor_vb = (valor_gap / valor_total_vb * 100) if valor_total_vb else 0.0
@@ -190,6 +224,7 @@ def materiais_abaixo_estoque_minimo(
         "qtd": int(len(abaixo)),
         "valor_total": round(-valor_gap, 2),
         "pct_valor_vb": round(pct_valor_vb, 2),
+        "itens": _montar_itens_gap(abaixo, gap, mapa_preco, sinal=-1),
     }
 
 
@@ -201,7 +236,8 @@ def materiais_acima_estoque_maximo(
     a ZMM028 tem. Entra na lista quem tem saldo ESTRITAMENTE maior que Estq.máx.
     cadastrado. Valor total é o excesso acima do máximo × preço médio (MM60),
     sempre POSITIVO (capital parado a mais). Mesmo `valor_total_vb` do indicador 1
-    como denominador do percentual."""
+    como denominador do percentual. `itens`: mesma lista do indicador 1, com
+    Quantidade/Valor POSITIVOS (excesso, não déficit)."""
     tp_mrp = df_zmm028_d009["Tp.MRP"].astype(str).str.strip()
     vb = df_zmm028_d009.loc[tp_mrp == "VB"]
 
@@ -210,7 +246,8 @@ def materiais_acima_estoque_maximo(
     acima = vb.loc[saldo > estq_max]
 
     excesso = saldo.loc[acima.index] - estq_max.loc[acima.index]
-    preco = _juntar_preco(acima, _mapa_preco_medio(df_mm60))
+    mapa_preco = _mapa_preco_medio(df_mm60)
+    preco = _juntar_preco(acima, mapa_preco)
     valor_excesso = float((excesso * preco).sum())
 
     pct_valor_vb = (valor_excesso / valor_total_vb * 100) if valor_total_vb else 0.0
@@ -219,6 +256,124 @@ def materiais_acima_estoque_maximo(
         "qtd": int(len(acima)),
         "valor_total": round(valor_excesso, 2),
         "pct_valor_vb": round(pct_valor_vb, 2),
+        "itens": _montar_itens_gap(acima, excesso, mapa_preco, sinal=1),
+    }
+
+
+def _formatar_tempo_parado(data_entrada: datetime.date, hoje: datetime.date) -> str:
+    """'3 anos e 5 meses' — omite a parte de anos quando for 0 (ex: '5 meses')."""
+    meses_totais = (hoje.year - data_entrada.year) * 12 + (hoje.month - data_entrada.month)
+    if hoje.day < data_entrada.day:
+        meses_totais -= 1
+    meses_totais = max(meses_totais, 0)
+    anos, meses = divmod(meses_totais, 12)
+
+    partes = []
+    if anos > 0:
+        partes.append(f"{anos} ano" if anos == 1 else f"{anos} anos")
+    if meses > 0 or anos == 0:
+        partes.append(f"{meses} mês" if meses == 1 else f"{meses} meses")
+    return " e ".join(partes)
+
+
+def _materiais_com_baixa_real(df_mb51: pd.DataFrame) -> set[str]:
+    """Materiais (código normalizado) com pelo menos uma linha de baixa/saída real
+    — BWART em config.BWART_BAIXA_REAL (Atendimento + 702 + Z30, sem exceção) E
+    quantidade (coluna "Qtd.  UM registro" — dois espaços, é o nome real da MB51)
+    ESTRITAMENTE positiva. Baixa com quantidade 0 é ajuste administrativo (fechar/
+    cancelar reserva ou ordem errada), não representa saída física — não conta como
+    "material já teve movimento" em NENHUM lugar que usar esse conceito, não só o
+    indicador 4 (por isso é uma função à parte, reutilizável)."""
+    bwart_ok = df_mb51["_bwart_norm"].isin(config.BWART_BAIXA_REAL)
+    quantidade = pd.to_numeric(df_mb51["Qtd.  UM registro"], errors="coerce").fillna(0)
+    baixas = df_mb51.loc[bwart_ok & (quantidade > 0)]
+    return set(_normalizar_material(baixas["Material"]))
+
+
+def materiais_nunca_movimentados(
+    df_zmm028_d009: pd.DataFrame,
+    df_mb51_completo: pd.DataFrame,
+    df_mm60: pd.DataFrame,
+    valor_total_vb: float,
+    total_materiais_vb: int,
+    hoje: datetime.date,
+) -> dict:
+    """Indicador 4 — Depósito D009, Classificação MRP = VB, SALDO POSITIVO
+    (Util.livre > 0 — material zerado é só cadastro sem estoque, não "capital físico
+    parado", não entra). Entra na lista quem NUNCA teve uma baixa/saída real (ver
+    _materiais_com_baixa_real — BWART_BAIXA_REAL com quantidade > 0) em TODO o
+    histórico disponível na MB51 — `df_mb51_completo` é o DataFrame cheio
+    (extratos.carregar_mb51), sem filtrar por dia, ao contrário dos outros
+    indicadores da MB51. Ter só entrada (comprou/recebeu, nunca saiu) NÃO tira o
+    material da lista — só saída real exclui.
+
+    "Data de Entrada" (pra Tempo Parado) é a PRIMEIRA linha de entrada
+    (config.BWART_RECEBIMENTO) em D009 pra aquele material; sem nenhuma entrada
+    registrada no período coberto pela MB51, fica None (Tempo Parado não é
+    calculável, não estimado).
+
+    `pct_valor_vb`: % do valor sobre o valor total dos materiais VB (mesma base de
+    1/2). `pct_distribuicao`: % da QUANTIDADE de materiais sobre o total de
+    materiais VB (`total_materiais_vb`, ver resumo_vb) — indicador diferente, não
+    confundir com pct_valor_vb."""
+    tp_mrp = df_zmm028_d009["Tp.MRP"].astype(str).str.strip()
+    vb = df_zmm028_d009.loc[tp_mrp == "VB"]
+    vb = vb.loc[_util_livre(vb) > 0].copy()
+    vb["_material_norm"] = _normalizar_material(vb["Material"])
+
+    mb51_d009 = df_mb51_completo.loc[df_mb51_completo["_deposito_norm"] == config.DEPOSITO_D009].copy()
+    mb51_d009["_material_norm"] = _normalizar_material(mb51_d009["Material"])
+
+    materiais_com_saida = _materiais_com_baixa_real(mb51_d009)
+    nunca_mov = vb.loc[~vb["_material_norm"].isin(materiais_com_saida)]
+
+    entradas = mb51_d009.loc[mb51_d009["_bwart_norm"].isin(config.BWART_RECEBIMENTO)]
+    primeira_entrada = entradas.groupby("_material_norm")["_data_norm"].min()
+
+    mapa_preco = _mapa_preco_medio(df_mm60)
+    preco = nunca_mov["_material_norm"].map(mapa_preco)
+    saldo = _util_livre(nunca_mov)
+    valor = saldo * preco  # NaN onde o material não tem preço na MM60
+
+    valor_total = float(valor.fillna(0).sum())
+    pct_valor_vb = (valor_total / valor_total_vb * 100) if valor_total_vb else 0.0
+    pct_distribuicao = (len(nunca_mov) / total_materiais_vb * 100) if total_materiais_vb else 0.0
+
+    tabela = pd.DataFrame(
+        {
+            "material": nunca_mov["_material_norm"],
+            "descricao": nunca_mov["Denom."].astype(str).str.strip(),
+            "unidade": nunca_mov["Unidade"].astype(str).str.strip(),
+            "classe": nunca_mov["Tp.MRP"].astype(str).str.strip(),
+            "quantidade": saldo.round(2),
+            "endereco": nunca_mov["Pos.dpst."].astype(str).str.strip(),
+            "valor": valor.round(2),
+            "_data_entrada": nunca_mov["_material_norm"].map(primeira_entrada),
+        }
+    )
+
+    registros = []
+    for r in tabela.to_dict(orient="records"):
+        data_entrada = r.pop("_data_entrada")
+        if pd.isna(r["valor"]):
+            r["valor"] = None
+        if pd.notna(data_entrada):
+            r["data_entrada"] = data_entrada.isoformat()
+            r["tempo_parado"] = _formatar_tempo_parado(data_entrada, hoje)
+        else:
+            r["data_entrada"] = None
+            r["tempo_parado"] = None
+        registros.append(r)
+
+    # entrada mais antiga primeiro; sem entrada conhecida vai pro final
+    registros.sort(key=lambda r: (r["data_entrada"] is None, r["data_entrada"] or ""))
+
+    return {
+        "qtd": int(len(nunca_mov)),
+        "valor_total": round(valor_total, 2),
+        "pct_valor_vb": round(pct_valor_vb, 2),
+        "pct_distribuicao": round(pct_distribuicao, 2),
+        "itens": registros,
     }
 
 

@@ -204,10 +204,13 @@ def test_montar_checklist_reservas_normaliza_material_com_sufixo_float():
     assert linhas[0]["saldo_atual"] == 9.0
 
 
-# ---- Tela Gestão de Estoque — Indicadores 1, 2 e 5 --------------------------
+# ---- Tela Gestão de Estoque — Indicadores 1, 2, 4 e 5 -----------------------
 
 def _zmm028_gestao(rows):
-    base = {"Material": "", "Util.livre": 0, "Val.total": 0.0, "Tp.MRP": "VB", "Pt.reabast": 0, "Estq.máx.": 0}
+    base = {
+        "Material": "", "Util.livre": 0, "Val.total": 0.0, "Tp.MRP": "VB", "Pt.reabast": 0, "Estq.máx.": 0,
+        "Denom.": "Item x", "Unidade": "UN", "Pos.dpst.": "A-01", "Depósito": "D009",
+    }
     return pd.DataFrame([{**base, **r} for r in rows])
 
 
@@ -302,6 +305,212 @@ def test_materiais_acima_estoque_maximo_valor_e_excesso_vezes_preco_positivo():
     resultado = indicadores.materiais_acima_estoque_maximo(zmm028, mm60, valor_total_vb=600.0)
     assert resultado["valor_total"] == 120.0
     assert resultado["pct_valor_vb"] == 20.0  # 120/600*100
+
+
+def test_materiais_abaixo_estoque_minimo_itens_colunas_e_sinal_negativo():
+    zmm028 = _zmm028_gestao(
+        [{"Material": "2.0", "Util.livre": 4, "Pt.reabast": 10, "Estq.máx.": 50, "Denom.": "Parafuso",
+          "Unidade": "UN", "Pos.dpst.": "B-02"}]
+    )
+    mm60 = _mm60([("2", 15.0)])
+    resultado = indicadores.materiais_abaixo_estoque_minimo(zmm028, mm60, valor_total_vb=100.0)
+    assert resultado["itens"] == [
+        {
+            "material": "2", "descricao": "Parafuso", "unidade": "UN", "classe": "VB",
+            "saldo_atual": 4.0, "pt_reabast": 10.0, "estoque_maximo": 50.0,
+            "quantidade": -6.0, "valor": -90.0, "endereco": "B-02",
+        }
+    ]
+
+
+def test_materiais_abaixo_estoque_minimo_itens_sem_preco_mm60_valor_none():
+    """Material sem preço na MM60: Quantidade continua calculada normalmente, mas
+    Valor fica None (não 0 — 0 pareceria preço real conhecido)."""
+    zmm028 = _zmm028_gestao([{"Material": "1", "Util.livre": 4, "Pt.reabast": 10}])
+    mm60 = _mm60([("999", 15.0)])  # material 1 não está na MM60
+    resultado = indicadores.materiais_abaixo_estoque_minimo(zmm028, mm60, valor_total_vb=100.0)
+    assert resultado["itens"][0]["quantidade"] == -6.0
+    assert resultado["itens"][0]["valor"] is None
+
+
+def test_materiais_acima_estoque_maximo_itens_colunas_e_sinal_positivo():
+    zmm028 = _zmm028_gestao(
+        [{"Material": "1", "Util.livre": 60, "Estq.máx.": 50, "Pt.reabast": 5, "Denom.": "Válvula",
+          "Unidade": "PC", "Pos.dpst.": "C-03"}]
+    )
+    mm60 = _mm60([("1", 12.0)])
+    resultado = indicadores.materiais_acima_estoque_maximo(zmm028, mm60, valor_total_vb=600.0)
+    item = resultado["itens"][0]
+    assert item["quantidade"] == 10.0
+    assert item["valor"] == 120.0
+    assert item["descricao"] == "Válvula"
+    assert item["endereco"] == "C-03"
+
+
+# ---- Indicador 4 — Materiais Nunca Movimentados -----------------------------
+
+def _mb51_mov(rows):
+    base = {
+        "Material": "", "_deposito_norm": "D009", "_bwart_norm": "", "_data_norm": HOJE,
+        "Qtd.  UM registro": 1,
+    }
+    if not rows:
+        # pd.DataFrame([]) não tem colunas nenhuma — mantém o schema mesmo vazio,
+        # igual extratos.carregar_mb51() sempre devolve (mesmo filtrado a zero linhas).
+        return pd.DataFrame(columns=list(base.keys()))
+    return pd.DataFrame([{**base, **r} for r in rows])
+
+
+def test_materiais_nunca_movimentados_exclui_quem_teve_saida_real():
+    """Material 1 teve uma saída (201, BWART_ATENDIMENTO) -> excluído. Material 2
+    nunca teve nenhuma linha -> entra na lista."""
+    zmm028 = _zmm028_gestao(
+        [
+            {"Material": "1", "Util.livre": 10},
+            {"Material": "2", "Util.livre": 5},
+        ]
+    )
+    mb51 = _mb51_mov([{"Material": "1", "_bwart_norm": "201"}])
+    mm60 = _mm60([("1", 1.0), ("2", 1.0)])
+    resultado = indicadores.materiais_nunca_movimentados(
+        zmm028, mb51, mm60, valor_total_vb=100.0, total_materiais_vb=2, hoje=HOJE
+    )
+    assert [i["material"] for i in resultado["itens"]] == ["2"]
+    assert resultado["qtd"] == 1
+
+
+def test_materiais_nunca_movimentados_702_e_z30_contam_como_baixa_real():
+    """702 e Z30 não são exceção — contam como baixa real igual qualquer BWART de
+    atendimento, cada um excluindo o material correspondente da lista."""
+    zmm028 = _zmm028_gestao(
+        [
+            {"Material": "1", "Util.livre": 10},
+            {"Material": "2", "Util.livre": 10},
+            {"Material": "3", "Util.livre": 10},
+        ]
+    )
+    mb51 = _mb51_mov(
+        [
+            {"Material": "1", "_bwart_norm": "702"},
+            {"Material": "2", "_bwart_norm": "Z30"},
+        ]
+    )
+    mm60 = _mm60([("1", 1.0), ("2", 1.0), ("3", 1.0)])
+    resultado = indicadores.materiais_nunca_movimentados(
+        zmm028, mb51, mm60, valor_total_vb=100.0, total_materiais_vb=3, hoje=HOJE
+    )
+    assert [i["material"] for i in resultado["itens"]] == ["3"]
+
+
+def test_materiais_nunca_movimentados_baixa_com_quantidade_zero_nao_conta():
+    """Baixa (BWART de saída real) com quantidade 0 é ajuste administrativo (fechar/
+    cancelar reserva errada) — não representa saída física, não exclui o material."""
+    zmm028 = _zmm028_gestao([{"Material": "1", "Util.livre": 10}])
+    mb51 = _mb51_mov([{"Material": "1", "_bwart_norm": "201", "Qtd.  UM registro": 0}])
+    mm60 = _mm60([("1", 1.0)])
+    resultado = indicadores.materiais_nunca_movimentados(
+        zmm028, mb51, mm60, valor_total_vb=100.0, total_materiais_vb=1, hoje=HOJE
+    )
+    assert resultado["qtd"] == 1  # continua "nunca movimentado"
+
+
+def test_materiais_nunca_movimentados_exige_saldo_positivo():
+    """Material com saldo 0 ou negativo é só cadastro sem estoque, não "capital
+    físico parado" — não entra na lista mesmo sem nenhuma saída registrada."""
+    zmm028 = _zmm028_gestao(
+        [
+            {"Material": "1", "Util.livre": 0},
+            {"Material": "2", "Util.livre": -3},
+            {"Material": "3", "Util.livre": 10},
+        ]
+    )
+    mb51 = _mb51_mov([])
+    mm60 = _mm60([("1", 1.0), ("2", 1.0), ("3", 1.0)])
+    resultado = indicadores.materiais_nunca_movimentados(
+        zmm028, mb51, mm60, valor_total_vb=100.0, total_materiais_vb=3, hoje=HOJE
+    )
+    assert [i["material"] for i in resultado["itens"]] == ["3"]
+
+
+def test_materiais_nunca_movimentados_entrada_sozinha_nao_exclui():
+    """Material só tem ENTRADA (101, BWART_RECEBIMENTO) — comprou/recebeu, nunca
+    saiu — continua na lista de nunca movimentados."""
+    zmm028 = _zmm028_gestao([{"Material": "1", "Util.livre": 10}])
+    mb51 = _mb51_mov([{"Material": "1", "_bwart_norm": "101", "_data_norm": datetime.date(2023, 1, 10)}])
+    mm60 = _mm60([("1", 1.0)])
+    resultado = indicadores.materiais_nunca_movimentados(
+        zmm028, mb51, mm60, valor_total_vb=100.0, total_materiais_vb=1, hoje=HOJE
+    )
+    assert resultado["qtd"] == 1
+    assert resultado["itens"][0]["data_entrada"] == "2023-01-10"
+
+
+def test_materiais_nunca_movimentados_ignora_saida_fora_do_deposito_d009():
+    """Saída registrada em D016 não conta pra excluir o material do recorte D009
+    (indicador 4 é D009, mesmo escopo dos indicadores 1/2)."""
+    zmm028 = _zmm028_gestao([{"Material": "1", "Util.livre": 10}])
+    mb51 = _mb51_mov([{"Material": "1", "_bwart_norm": "201", "_deposito_norm": "D016"}])
+    mm60 = _mm60([("1", 1.0)])
+    resultado = indicadores.materiais_nunca_movimentados(
+        zmm028, mb51, mm60, valor_total_vb=100.0, total_materiais_vb=1, hoje=HOJE
+    )
+    assert resultado["qtd"] == 1
+
+
+def test_materiais_nunca_movimentados_sem_entrada_conhecida_data_e_tempo_ficam_none():
+    zmm028 = _zmm028_gestao([{"Material": "1", "Util.livre": 10}])
+    mb51 = _mb51_mov([])
+    mm60 = _mm60([("1", 1.0)])
+    resultado = indicadores.materiais_nunca_movimentados(
+        zmm028, mb51, mm60, valor_total_vb=100.0, total_materiais_vb=1, hoje=HOJE
+    )
+    item = resultado["itens"][0]
+    assert item["data_entrada"] is None
+    assert item["tempo_parado"] is None
+
+
+def test_materiais_nunca_movimentados_valor_e_percentuais():
+    """Saldo 10 x preço 5 = 50.0. pct_valor_vb sobre valor_total_vb=500 -> 10%.
+    pct_distribuicao sobre total_materiais_vb=4 (1 de 4) -> 25%."""
+    zmm028 = _zmm028_gestao([{"Material": "1", "Util.livre": 10}])
+    mb51 = _mb51_mov([])
+    mm60 = _mm60([("1", 5.0)])
+    resultado = indicadores.materiais_nunca_movimentados(
+        zmm028, mb51, mm60, valor_total_vb=500.0, total_materiais_vb=4, hoje=HOJE
+    )
+    assert resultado["valor_total"] == 50.0
+    assert resultado["pct_valor_vb"] == 10.0
+    assert resultado["pct_distribuicao"] == 25.0
+
+
+def test_materiais_nunca_movimentados_ordena_entrada_mais_antiga_primeiro():
+    zmm028 = _zmm028_gestao(
+        [
+            {"Material": "1", "Util.livre": 10},
+            {"Material": "2", "Util.livre": 10},
+            {"Material": "3", "Util.livre": 10},
+        ]
+    )
+    mb51 = _mb51_mov(
+        [
+            {"Material": "1", "_bwart_norm": "101", "_data_norm": datetime.date(2024, 6, 1)},
+            {"Material": "2", "_bwart_norm": "101", "_data_norm": datetime.date(2022, 1, 15)},
+            # material 3: sem entrada nenhuma -> vai pro final
+        ]
+    )
+    mm60 = _mm60([("1", 1.0), ("2", 1.0), ("3", 1.0)])
+    resultado = indicadores.materiais_nunca_movimentados(
+        zmm028, mb51, mm60, valor_total_vb=100.0, total_materiais_vb=3, hoje=HOJE
+    )
+    assert [i["material"] for i in resultado["itens"]] == ["2", "1", "3"]
+
+
+def test_formatar_tempo_parado_anos_e_meses():
+    assert indicadores._formatar_tempo_parado(datetime.date(2023, 3, 5), datetime.date(2026, 8, 5)) == "3 anos e 5 meses"
+    assert indicadores._formatar_tempo_parado(datetime.date(2026, 5, 5), datetime.date(2026, 8, 5)) == "3 meses"
+    assert indicadores._formatar_tempo_parado(datetime.date(2025, 8, 5), datetime.date(2026, 8, 5)) == "1 ano"
+    assert indicadores._formatar_tempo_parado(datetime.date(2026, 8, 5), datetime.date(2026, 8, 5)) == "0 meses"
+    assert indicadores._formatar_tempo_parado(datetime.date(2026, 7, 20), datetime.date(2026, 8, 5)) == "0 meses"
 
 
 def test_classificacao_mrp_agrupa_por_classe_e_manda_zero_e_negativo_pra_fora():

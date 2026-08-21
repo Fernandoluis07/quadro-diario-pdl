@@ -51,3 +51,14 @@ BWART_RECEBIMENTO = {"101", "835"}
 # 601/833 também entram em BWART_ATENDIMENTO acima — Intercompany é uma leitura adicional
 # sobre as MESMAS movimentações (por documento único, não por linha), não uma categoria à parte.
 BWART_INTERCOMPANY = {"601", "833"}
+
+# "Já teve baixa/saída real alguma vez" — conceito usado pelo indicador 4 (Materiais
+# Nunca Movimentados) e reutilizável por qualquer outro indicador que precise da mesma
+# pergunta no futuro. Superset de BWART_ATENDIMENTO: 702 e Z30 são baixa real também,
+# não são exceção (confirmados na MB51 real: 48 linhas de 702, 410 de Z30). NÃO conta
+# BWART_ESTORNO (são estornos/reversão de uma baixa anterior, não uma baixa em si).
+# IMPORTANTE: pertencer a este conjunto não basta — uma linha só conta como baixa real
+# se a quantidade também for maior que zero (ver indicadores._materiais_com_baixa_real).
+# Baixa com quantidade 0 é ajuste administrativo (fechar/cancelar reserva ou ordem
+# errada), não saída física.
+BWART_BAIXA_REAL = BWART_ATENDIMENTO | {"702", "Z30"}

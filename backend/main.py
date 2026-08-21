@@ -104,6 +104,9 @@ def calcular_todos_indicadores(
     qtd_total_vb, valor_total_vb = indicadores.resumo_vb(zmm028)
     abaixo_minimo = indicadores.materiais_abaixo_estoque_minimo(zmm028, mm60, valor_total_vb)
     acima_maximo = indicadores.materiais_acima_estoque_maximo(zmm028, mm60, valor_total_vb)
+    nunca_movimentados = indicadores.materiais_nunca_movimentados(
+        zmm028, mb51, mm60, valor_total_vb, qtd_total_vb, hoje
+    )
 
     resultado = {
         "data_referencia": hoje.isoformat(),
@@ -123,6 +126,13 @@ def calcular_todos_indicadores(
         "materiais_acima_estoque_maximo_qtd": acima_maximo["qtd"],
         "materiais_acima_estoque_maximo_valor_total": acima_maximo["valor_total"],
         "materiais_acima_estoque_maximo_pct_valor_vb": acima_maximo["pct_valor_vb"],
+        "materiais_abaixo_estoque_minimo_itens": abaixo_minimo["itens"],
+        "materiais_acima_estoque_maximo_itens": acima_maximo["itens"],
+        "materiais_nunca_movimentados_qtd": nunca_movimentados["qtd"],
+        "materiais_nunca_movimentados_valor_total": nunca_movimentados["valor_total"],
+        "materiais_nunca_movimentados_pct_valor_vb": nunca_movimentados["pct_valor_vb"],
+        "materiais_nunca_movimentados_pct_distribuicao": nunca_movimentados["pct_distribuicao"],
+        "materiais_nunca_movimentados_itens": nunca_movimentados["itens"],
         "classificacao_mrp": indicadores.classificacao_mrp(zmm028_todos_depositos),
         "materiais_vb_sem_preco_mm60": indicadores.materiais_vb_sem_preco_mm60(zmm028, mm60),
         "ontem": _calcular_bloco1(mb51, ontem) if ontem else None,

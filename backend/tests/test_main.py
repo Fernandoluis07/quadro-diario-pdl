@@ -17,7 +17,7 @@ def _linha_mb51(material, deposito, bwart, data, referencia):
     return {
         "Material": material, "Texto breve material": "x", "Centro": "2003",
         "Depósito": deposito, "Tipo de movimento": bwart, "Data de lançamento": data,
-        "Qtd. UM registro": 1, "UM registro": "UN", "Montante em MI": 1.0,
+        "Qtd.  UM registro": 1, "UM registro": "UN", "Montante em MI": 1.0,
         "Reserva": "R1", "Referência": referencia, "Nome do usuário": "fernando",
     }
 
@@ -102,6 +102,44 @@ def test_calcula_indicadores_gestao_estoque_1_2_5(tmp_path, monkeypatch):
     assert itens_por_classe["VB"] == {"classe": "VB", "qtd": 1, "valor_total": 10.0}
     assert itens_por_classe["ND"]["qtd"] == 0
     assert resultado["materiais_vb_sem_preco_mm60"] == []  # o único material VB está na MM60
+    assert resultado["materiais_abaixo_estoque_minimo_itens"] == []
+    assert resultado["materiais_acima_estoque_maximo_itens"] == []
+
+    # material 3001 nunca aparece na MB51 da fixture -> sem saída nem entrada
+    # registrada -> "nunca movimentado", com data de entrada desconhecida.
+    assert resultado["materiais_nunca_movimentados_qtd"] == 1
+    assert resultado["materiais_nunca_movimentados_valor_total"] == 10.0  # saldo 1 x preço 10.0
+    assert resultado["materiais_nunca_movimentados_pct_valor_vb"] == 100.0
+    assert resultado["materiais_nunca_movimentados_pct_distribuicao"] == 100.0
+    item_nunca_mov = resultado["materiais_nunca_movimentados_itens"][0]
+    assert item_nunca_mov["material"] == "3001"
+    assert item_nunca_mov["data_entrada"] is None
+    assert item_nunca_mov["tempo_parado"] is None
+
+
+def test_materiais_nunca_movimentados_exclui_material_com_saida_registrada(tmp_path, monkeypatch):
+    """Material 1004 TEM uma saída (BWART 201) na MB51 da fixture -> não pode entrar
+    na lista de nunca movimentados, mesmo tendo saldo positivo na ZMM028."""
+    monkeypatch.setattr(config, "MM60_DIR", str(tmp_path))
+    mb51 = pd.DataFrame([_linha_mb51("1004", "D009", 201, DIA3, "NF-D")])
+    mb25 = pd.DataFrame(
+        [{"Reserva": "R1", "Material": "2001", "Texto breve material": "x", "Depósito": "D009",
+          "Qtd.necessária": None, "Data da necessidade": None, "Centro custo": None, "Ordem": None}]
+    )
+    zmm028 = pd.DataFrame(
+        [{"Material": "1004", "Denom.": "x", "Unidade": "UN", "Centro": "2003", "Util.livre": 5,
+          "Val.total": 50.0, "Pos.dpst.": "A-01", "Tp.MRP": "VB", "Depósito": "D009",
+          "Estq.máx.": 100, "Pt.reabast": 1}]
+    )
+    mm60 = pd.DataFrame([{"Material": "1004", "Centro": "2003", "Texto breve material": "x", "Preço": 10.0, "Moeda": "BRL"}])
+    mb51.to_excel(tmp_path / config.MB51_FILENAME, index=False)
+    mb25.to_excel(tmp_path / config.MB25_FILENAME, index=False)
+    zmm028.to_excel(tmp_path / config.ZMM028_FILENAME, index=False)
+    mm60.to_excel(tmp_path / config.MM60_FILENAME, index=False)
+
+    resultado = main.calcular_todos_indicadores(bases_dir=str(tmp_path))
+    assert resultado["materiais_nunca_movimentados_qtd"] == 0
+    assert resultado["materiais_nunca_movimentados_itens"] == []
 
 
 def test_materiais_vb_sem_preco_mm60_aparece_no_resultado(tmp_path, monkeypatch):

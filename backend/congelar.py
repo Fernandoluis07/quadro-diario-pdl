@@ -59,6 +59,10 @@ CAMPOS_ZMM028 = (
     "materiais_acima_estoque_maximo_qtd",
     "materiais_acima_estoque_maximo_valor_total",
     "materiais_acima_estoque_maximo_pct_valor_vb",
+    "materiais_nunca_movimentados_qtd",
+    "materiais_nunca_movimentados_valor_total",
+    "materiais_nunca_movimentados_pct_valor_vb",
+    "materiais_nunca_movimentados_pct_distribuicao",
 )
 
 _STATUS_CLASSE = {
@@ -333,6 +337,22 @@ def congelar_dia(
     # sempre sobrescrita a cada congelamento.
     html_novo = atualizar_constante_historico_js(
         html_novo, "CLASSIFICACAO_MRP", indicadores["classificacao_mrp"]
+    )
+
+    # Listas detalhadas dos indicadores 1/2/4 (Gestão de Estoque) — usadas só pra
+    # exportação (planilha com a lista completa de materiais), mesma lógica de
+    # "fotografia atual" do CHECKLIST_RESERVAS/CLASSIFICACAO_MRP: não entram no
+    # historico_zmm028.json (só os campos achatados de CAMPOS_ZMM028 acima entram
+    # lá, pro gráfico de tendência) — a lista em si não tem valor histórico, e
+    # guardá-la dia a dia inflaria o JSON à toa.
+    html_novo = atualizar_constante_historico_js(
+        html_novo, "MATERIAIS_ABAIXO_MINIMO", {"itens": indicadores["materiais_abaixo_estoque_minimo_itens"]}
+    )
+    html_novo = atualizar_constante_historico_js(
+        html_novo, "MATERIAIS_ACIMA_MAXIMO", {"itens": indicadores["materiais_acima_estoque_maximo_itens"]}
+    )
+    html_novo = atualizar_constante_historico_js(
+        html_novo, "MATERIAIS_NUNCA_MOVIMENTADOS", {"itens": indicadores["materiais_nunca_movimentados_itens"]}
     )
 
     html_novo = atualizar_painel_pontos_avisos(html_novo, pontos_atencao, avisos_importantes)
