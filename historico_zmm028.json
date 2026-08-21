@@ -846,9 +846,9 @@
     "materiais_acima_estoque_maximo_qtd": 1271,
     "materiais_acima_estoque_maximo_valor_total": 4571202.61,
     "materiais_acima_estoque_maximo_pct_valor_vb": 28.12,
-    "materiais_nunca_movimentados_qtd": 549,
-    "materiais_nunca_movimentados_valor_total": 5307137.86,
-    "materiais_nunca_movimentados_pct_valor_vb": 32.64,
-    "materiais_nunca_movimentados_pct_distribuicao": 19.48
+    "materiais_nunca_movimentados_qtd": 495,
+    "materiais_nunca_movimentados_valor_total": 4865348.9,
+    "materiais_nunca_movimentados_pct_valor_vb": 29.93,
+    "materiais_nunca_movimentados_pct_distribuicao": 17.57
   }
 }
