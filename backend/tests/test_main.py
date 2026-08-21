@@ -22,7 +22,10 @@ def _linha_mb51(material, deposito, bwart, data, referencia):
     }
 
 
-def _preparar_bases(tmp_path):
+def _preparar_bases(tmp_path, monkeypatch):
+    # MM60 mora fixa em config.MM60_DIR (dentro do repo), não em bases_dir — redireciona
+    # pro tmp_path do teste, senão main.py tentaria ler a MM60 real do projeto.
+    monkeypatch.setattr(config, "MM60_DIR", str(tmp_path))
     mb51 = pd.DataFrame(
         [
             _linha_mb51("1001", "D009", 201, DIA1, "NF-A"),  # dia mais antigo
@@ -40,14 +43,16 @@ def _preparar_bases(tmp_path):
           "Val.total": 10.0, "Pos.dpst.": "A-01", "Tp.MRP": "VB", "Depósito": "D009",
           "Estq.máx.": 1, "Pt.reabast": 1}]
     )
+    mm60 = pd.DataFrame([{"Material": "3001", "Centro": "2003", "Texto breve material": "x", "Preço": 10.0, "Moeda": "BRL"}])
     mb51.to_excel(tmp_path / config.MB51_FILENAME, index=False)
     mb25.to_excel(tmp_path / config.MB25_FILENAME, index=False)
     zmm028.to_excel(tmp_path / config.ZMM028_FILENAME, index=False)
+    mm60.to_excel(tmp_path / config.MM60_FILENAME, index=False)
     return str(tmp_path)
 
 
-def test_detecta_hoje_como_data_mais_recente_do_arquivo_sem_usar_relogio(tmp_path):
-    bases_dir = _preparar_bases(tmp_path)
+def test_detecta_hoje_como_data_mais_recente_do_arquivo_sem_usar_relogio(tmp_path, monkeypatch):
+    bases_dir = _preparar_bases(tmp_path, monkeypatch)
     resultado = main.calcular_todos_indicadores(bases_dir=bases_dir)
     assert resultado["data_referencia"] == "2026-08-05"
     assert resultado["linhas_atendidas_d009"] == 1  # só a linha do dia 3
@@ -59,8 +64,8 @@ def test_detecta_hoje_como_data_mais_recente_do_arquivo_sem_usar_relogio(tmp_pat
     ]
 
 
-def test_detecta_ontem_como_segunda_data_mais_recente(tmp_path):
-    bases_dir = _preparar_bases(tmp_path)
+def test_detecta_ontem_como_segunda_data_mais_recente(tmp_path, monkeypatch):
+    bases_dir = _preparar_bases(tmp_path, monkeypatch)
     resultado = main.calcular_todos_indicadores(bases_dir=bases_dir)
     assert resultado["data_referencia_ontem"] == "2026-08-04"
     assert resultado["ontem"]["linhas_atendidas_d009"] == 2  # as 2 linhas do dia 2
@@ -71,15 +76,62 @@ def test_ontem_traz_os_mesmos_8_indicadores_do_bloco1():
     assert len(_CHAVES_BLOCO1) == 8
 
 
-def test_parametro_data_forca_hoje_manualmente_e_ontem_vira_a_data_anterior_no_arquivo(tmp_path):
-    bases_dir = _preparar_bases(tmp_path)
+def test_parametro_data_forca_hoje_manualmente_e_ontem_vira_a_data_anterior_no_arquivo(tmp_path, monkeypatch):
+    bases_dir = _preparar_bases(tmp_path, monkeypatch)
     resultado = main.calcular_todos_indicadores(bases_dir=bases_dir, data_ref=datetime.date(2026, 8, 4))
     assert resultado["data_referencia"] == "2026-08-04"
     assert resultado["data_referencia_ontem"] == "2026-08-01"
     assert resultado["ontem"]["linhas_atendidas_d009"] == 1  # a linha do dia 1
 
 
-def test_sem_segunda_data_no_arquivo_ontem_fica_none(tmp_path):
+def test_calcula_indicadores_gestao_estoque_1_2_5(tmp_path, monkeypatch):
+    """Material único da fixture (3001): Util.livre=1 == Pt.reabast=1 (não entra no
+    indicador 1, estrito) e Util.livre=1 == Estq.máx.=1 (não entra no indicador 2,
+    estrito) — os dois ficam zerados. Classificação de MRP enxerga o mesmo material
+    (saldo positivo, VB)."""
+    bases_dir = _preparar_bases(tmp_path, monkeypatch)
+    resultado = main.calcular_todos_indicadores(bases_dir=bases_dir)
+
+    assert resultado["total_materiais_vb_d009"] == 1
+    assert resultado["materiais_abaixo_estoque_minimo_qtd"] == 0
+    assert resultado["materiais_abaixo_estoque_minimo_valor_total"] == 0.0
+    assert resultado["materiais_acima_estoque_maximo_qtd"] == 0
+    assert resultado["materiais_acima_estoque_maximo_valor_total"] == 0.0
+    assert resultado["classificacao_mrp"]["total"] == 1
+    itens_por_classe = {i["classe"]: i for i in resultado["classificacao_mrp"]["itens"]}
+    assert itens_por_classe["VB"] == {"classe": "VB", "qtd": 1, "valor_total": 10.0}
+    assert itens_por_classe["ND"]["qtd"] == 0
+    assert resultado["materiais_vb_sem_preco_mm60"] == []  # o único material VB está na MM60
+
+
+def test_materiais_vb_sem_preco_mm60_aparece_no_resultado(tmp_path, monkeypatch):
+    """MM60 vazia (nenhum preço cadastrado) -> o único material VB da fixture entra
+    no alerta, e o valor dos indicadores 1/2 fica 0 (sem preço pra calcular gap/excesso)."""
+    monkeypatch.setattr(config, "MM60_DIR", str(tmp_path))
+    mb51 = pd.DataFrame([_linha_mb51("1001", "D009", 201, DIA3, "NF-D")])
+    mb25 = pd.DataFrame(
+        [{"Reserva": "R1", "Material": "2001", "Texto breve material": "x", "Depósito": "D009",
+          "Qtd.necessária": None, "Data da necessidade": None, "Centro custo": None, "Ordem": None}]
+    )
+    zmm028 = pd.DataFrame(
+        [{"Material": "3001", "Denom.": "x", "Unidade": "UN", "Centro": "2003", "Util.livre": 1,
+          "Val.total": 10.0, "Pos.dpst.": "A-01", "Tp.MRP": "VB", "Depósito": "D009",
+          "Estq.máx.": 0, "Pt.reabast": 5}]
+    )
+    mm60_vazia = pd.DataFrame([{"Material": "9999999", "Centro": "2003", "Texto breve material": "outro", "Preço": 1.0, "Moeda": "BRL"}])
+    mb51.to_excel(tmp_path / config.MB51_FILENAME, index=False)
+    mb25.to_excel(tmp_path / config.MB25_FILENAME, index=False)
+    zmm028.to_excel(tmp_path / config.ZMM028_FILENAME, index=False)
+    mm60_vazia.to_excel(tmp_path / config.MM60_FILENAME, index=False)
+
+    resultado = main.calcular_todos_indicadores(bases_dir=str(tmp_path))
+    assert resultado["materiais_vb_sem_preco_mm60"] == ["3001"]
+    assert resultado["materiais_abaixo_estoque_minimo_qtd"] == 1  # 1 < 5, entra mesmo sem preço
+    assert resultado["materiais_abaixo_estoque_minimo_valor_total"] == 0.0  # sem preço -> 0, não estimado
+
+
+def test_sem_segunda_data_no_arquivo_ontem_fica_none(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "MM60_DIR", str(tmp_path))
     mb51 = pd.DataFrame([_linha_mb51("1001", "D009", 201, DIA3, "NF-D")])
     mb25 = pd.DataFrame(
         [{"Reserva": "R1", "Material": "2001", "Texto breve material": "x", "Depósito": "D009",
@@ -90,9 +142,11 @@ def test_sem_segunda_data_no_arquivo_ontem_fica_none(tmp_path):
           "Val.total": 10.0, "Pos.dpst.": "A-01", "Tp.MRP": "VB", "Depósito": "D009",
           "Estq.máx.": 1, "Pt.reabast": 1}]
     )
+    mm60 = pd.DataFrame([{"Material": "3001", "Centro": "2003", "Texto breve material": "x", "Preço": 10.0, "Moeda": "BRL"}])
     mb51.to_excel(tmp_path / config.MB51_FILENAME, index=False)
     mb25.to_excel(tmp_path / config.MB25_FILENAME, index=False)
     zmm028.to_excel(tmp_path / config.ZMM028_FILENAME, index=False)
+    mm60.to_excel(tmp_path / config.MM60_FILENAME, index=False)
 
     resultado = main.calcular_todos_indicadores(bases_dir=str(tmp_path))
     assert resultado["data_referencia"] == "2026-08-05"

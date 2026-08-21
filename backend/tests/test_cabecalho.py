@@ -7,7 +7,7 @@ import openpyxl
 import pandas as pd
 import pytest
 
-from backend import cabecalho, config
+from backend import cabecalho, config, extratos
 from backend.tests.test_congelar import INDEX_HTML_SINTETICO
 
 
@@ -49,6 +49,11 @@ def _preparar_bases(tmp_path):
     )
     zmm028.to_excel(bases_dir / config.ZMM028_FILENAME, index=False)
 
+    # MM60 é fixa (config.MM60_DIR, redirecionada pra tmp_path/MM60Fixo em
+    # _isolar_repo_root), NÃO fica dentro de bases_dir — mesma separação da produção.
+    mm60 = pd.DataFrame([{"Material": "3001", "Centro": "2003", "Texto breve material": "A", "Preço": 10.0, "Moeda": "BRL"}])
+    mm60.to_excel(tmp_path / "MM60Fixo" / config.MM60_FILENAME, index=False)
+
     manual_path = bases_dir / "planilha_manual_quadro_diario.xlsx"
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
@@ -84,14 +89,17 @@ def _preparar_index(tmp_path):
 def _isolar_repo_root(tmp_path, monkeypatch):
     """congelar_dia grava os 4 JSON na raiz do repo real por padrão (REPO_ROOT do
     módulo) — redireciona pro tmp_path do teste, senão os testes escreveriam em cima
-    dos históricos reais do projeto."""
+    dos históricos reais do projeto. MM60_DIR (pasta fixa "Bases" dentro do repo, ver
+    backend/config.py) também é redirecionada pelo mesmo motivo."""
     monkeypatch.setattr(cabecalho, "REPO_ROOT", str(tmp_path))
+    monkeypatch.setattr(config, "MM60_DIR", str(tmp_path / "MM60Fixo"))
+    (tmp_path / "MM60Fixo").mkdir()
     return tmp_path
 
 
 def test_checar_arquivos_lista_o_que_falta(tmp_path):
     faltando = cabecalho._checar_arquivos(str(tmp_path), str(tmp_path / "manual.xlsx"))
-    assert len(faltando) == 4
+    assert len(faltando) == 5
 
 
 def test_executar_aborta_sem_alterar_nada_quando_usuario_recusa_congelar(tmp_path, monkeypatch):
@@ -103,6 +111,31 @@ def test_executar_aborta_sem_alterar_nada_quando_usuario_recusa_congelar(tmp_pat
 
     assert codigo == 0
     assert not (tmp_path / "historico_mb51.json").exists()
+
+
+def test_executar_le_mb51_do_disco_uma_unica_vez(tmp_path, monkeypatch):
+    """MB51 é a maior das 3 planilhas do dia (~5,8MB/83 mil linhas em produção) — tinha
+    sido lida do disco 2x por execução (main.calcular_todos_indicadores + Resumo do Mês,
+    cada um chamando extratos.carregar_mb51 por conta própria). Reproduz o achado de
+    performance: conta quantas vezes extratos.carregar_mb51 é chamada numa execução
+    completa e exige que seja exatamente 1."""
+    bases_dir, manual_path = _preparar_bases(tmp_path)
+    index_path = _preparar_index(tmp_path)
+    monkeypatch.setattr("builtins.input", lambda _: "n")  # recusa "Posso congelar?"
+
+    chamadas = []
+    original = extratos.carregar_mb51
+
+    def _carregar_mb51_contado(caminho):
+        chamadas.append(caminho)
+        return original(caminho)
+
+    monkeypatch.setattr(cabecalho.extratos, "carregar_mb51", _carregar_mb51_contado)
+
+    codigo = cabecalho.executar(bases_dir=bases_dir, manual_path=manual_path, index_path=index_path)
+
+    assert codigo == 0
+    assert len(chamadas) == 1
 
 
 def test_executar_congela_mas_nao_sobe_quando_usuario_recusa_push(tmp_path, monkeypatch):

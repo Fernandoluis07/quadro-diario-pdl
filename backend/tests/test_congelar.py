@@ -93,6 +93,7 @@ const HISTORICO_ZMM028 = {"2026-08-09":{"itens_estoque_com_saldo":100,"itens_mrp
 const HISTORICO_MENSAL = {"2026-08":{"linhas_atendidas_mes":10}};
 const HISTORICO_PAINEIS = {"2026-08-09":{"pontos_atencao":["Ponto velho"],"avisos_importantes":[],"datas_importantes":[]}};
 const CHECKLIST_RESERVAS = {"rows":[]};
+const CLASSIFICACAO_MRP = {"total":0,"itens":[]};
 </script>
 </body></html>
 """
@@ -114,6 +115,22 @@ INDICADORES_HOJE = {
     "valor_estoque_total": 28095123.45,
     "itens_mrp_saldo_zero": 173,
     "itens_sem_endereco": 1,
+    "total_materiais_vb_d009": 5412,
+    "materiais_abaixo_estoque_minimo_qtd": 342,
+    "materiais_abaixo_estoque_minimo_valor_total": -1249850.72,
+    "materiais_abaixo_estoque_minimo_pct_valor_vb": 3.96,
+    "materiais_acima_estoque_maximo_qtd": 278,
+    "materiais_acima_estoque_maximo_valor_total": 2873420.55,
+    "materiais_acima_estoque_maximo_pct_valor_vb": 3.44,
+    "classificacao_mrp": {
+        "total": 3052,
+        "itens": [
+            {"classe": "VB", "qtd": 1258, "valor_total": 4258650.45},
+            {"classe": "ND", "qtd": 865, "valor_total": 2987540.32},
+            {"classe": "PD", "qtd": 542, "valor_total": 1684320.10},
+            {"classe": "Vazios", "qtd": 387, "valor_total": 1023180.24},
+        ],
+    },
     "checklist_reservas": [
         {"numero_reserva": "R1", "material": "100", "descricao": "Item A", "data_necessidade": "20/08/2026",
          "qtd_necessaria": 5.0, "centro_custo": "", "ordem": "O1", "saldo_atual": 42.0, "endereco": "A-01"},
@@ -197,6 +214,13 @@ def test_montar_entrada_zmm028():
     assert entrada == {
         "itens_estoque_com_saldo": 5323, "itens_mrp_saldo_zero": 173,
         "valor_estoque_total": 28095123.45, "itens_sem_endereco": 1,
+        "total_materiais_vb_d009": 5412,
+        "materiais_abaixo_estoque_minimo_qtd": 342,
+        "materiais_abaixo_estoque_minimo_valor_total": -1249850.72,
+        "materiais_abaixo_estoque_minimo_pct_valor_vb": 3.96,
+        "materiais_acima_estoque_maximo_qtd": 278,
+        "materiais_acima_estoque_maximo_valor_total": 2873420.55,
+        "materiais_acima_estoque_maximo_pct_valor_vb": 3.44,
     }
 
 
@@ -316,6 +340,8 @@ def test_congelar_dia_grava_os_5_json_e_atualiza_index_html(tmp_path):
     assert '"2026-08-10":{"pontos_atencao":["Ponto novo"],"avisos_importantes":["Aviso novo"],"datas_importantes":[]}' in html_novo
 
     assert '"rows":[{"numero_reserva":"R1","material":"100","descricao":"Item A","data_necessidade":"20/08/2026","qtd_necessaria":5.0,"centro_custo":"","ordem":"O1","saldo_atual":42.0,"endereco":"A-01"}]' in html_novo
+    assert '"materiais_abaixo_estoque_minimo_qtd":342' in html_novo
+    assert 'const CLASSIFICACAO_MRP = {"itens":[{"classe":"VB","qtd":1258,"valor_total":4258650.45}' in html_novo
 
 
 def test_congelar_dia_recusa_sobrescrever_dia_ja_congelado(tmp_path):

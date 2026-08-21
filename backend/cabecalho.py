@@ -13,11 +13,15 @@ Fluxo, com confirmação em cada etapa importante:
      pendente de envio), bloqueia e pede intervenção manual — nunca tenta resolver
      sozinho, porque o índice do site (index.html) tem linhas de até 150 mil
      caracteres que git não consegue mesclar automaticamente.
-  2. Lê as 3 planilhas SAP (MB51.xlsx, MB25.xlsx, ZMM028.xlsx) + a
-     planilha_manual_quadro_diario.xlsx da pasta "03. Bases" (ou --bases-dir/--manual).
+  2. Lê as 3 planilhas SAP do dia (MB51.xlsx, MB25.xlsx, ZMM028.xlsx) + a
+     planilha_manual_quadro_diario.xlsx da pasta "03. Bases" (ou --bases-dir/--manual),
+     e a MM60.xlsx (preço de referência, atualizada esporadicamente — não faz parte
+     do ciclo diário) da pasta fixa "Bases" dentro do próprio repositório.
   3. Calcula os 20 indicadores + Resumo do Mês, reaproveitando main.py/indicadores.py/
-     historico_mensal.py — não recalcula nada que já existe.
-  4. Mostra um resumo e pergunta "Posso congelar?".
+     historico_mensal.py — não recalcula nada que já existe. NÃO mostra esses números
+     na tela (removido por pedido — ninguém queria mais conferir o resumo antes de
+     confirmar); só imprime um ALERTA, se houver, de material VB sem preço na MM60.
+  4. Pergunta "Posso congelar?".
   5. Se sim, congela (backend/congelar.py) — um dia já congelado antes só é
      sobrescrito se o usuário pedir reprocessamento forçado E digitar a senha
      correta (config.SENHA_FORCAR_RECONGELAMENTO_SHA256); sem a senha certa,
@@ -27,7 +31,8 @@ Fluxo, com confirmação em cada etapa importante:
      "git add -A") + commit + push — esta pasta é compartilhada por várias
      pessoas ao mesmo tempo, então "-A" pegaria qualquer coisa solta de outra
      pessoa junto (já aconteceu: código e uma exclusão de arquivo de outra
-     pessoa foram parar num commit "Congela dia").
+     pessoa foram parar num commit "Congela dia"). Termina com uma mensagem clara
+     de sucesso ("✅ Tudo certo!") quando congela E sobe sem erro.
 
 Uso:
     python -m backend.cabecalho
@@ -45,8 +50,7 @@ import os
 import subprocess
 import sys
 
-from . import config, congelar, historico_mensal, planilha_manual
-from .html_writer import formatar_inteiro_br, formatar_valor_estoque_milhares
+from . import config, congelar, extratos, historico_mensal, planilha_manual
 from .main import _parse_data, calcular_todos_indicadores
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -77,76 +81,31 @@ def _checar_arquivos(bases_dir: str, manual_path: str) -> list[str]:
         ("mb51.xlsx", os.path.join(bases_dir, config.MB51_FILENAME)),
         ("mb25.xlsx", os.path.join(bases_dir, config.MB25_FILENAME)),
         ("ZMM028.xlsx", os.path.join(bases_dir, config.ZMM028_FILENAME)),
+        # MM60 NÃO é trocada todo dia (preço de referência) — fica fixa em
+        # config.MM60_DIR (dentro do próprio repo), não em bases_dir.
+        ("MM60.xlsx", os.path.join(config.MM60_DIR, config.MM60_FILENAME)),
         ("planilha manual", manual_path),
     ]
     faltando = [f"{nome} (esperado em {caminho})" for nome, caminho in esperados if not os.path.exists(caminho)]
     return faltando
 
 
-def _imprimir_resumo(
-    hoje: datetime.date,
-    indicadores: dict,
-    manual_hoje: dict,
-    resumo_mes: dict,
-    pontos_avisos: dict,
-    datas_importantes: list[dict],
-) -> None:
-    ontem = indicadores.get("ontem") or {}
-    linha = "-" * 60
-
-    print(linha)
-    print(f"Quadro Diário PDL — resumo calculado para {hoje:%d/%m/%Y}")
-    print(linha)
-
-    print("\nBloco 1 — Fluxo do Dia (MB51):")
-    for chave, titulo in [
-        ("linhas_atendidas_d009", "1. Linhas Atendidas D009"),
-        ("linhas_atendidas_d016", "2. Linhas Atendidas D016"),
-        ("recebimentos_d009", "3. Recebimentos D009"),
-        ("recebimentos_d016", "4. Recebimentos D016"),
-        ("estornos_d009", "5. Estornos D009"),
-        ("estornos_d016", "6. Estornos D016"),
-        ("inventario_rotativo_d009", "7. Inventário Rotativo D009"),
-        ("inventario_rotativo_d016", "8. Inventário Rotativo D016"),
-    ]:
-        hoje_v = indicadores[chave]
-        ontem_v = ontem.get(chave)
-        sufixo = f" (ontem: {formatar_inteiro_br(ontem_v)})" if ontem_v is not None else ""
-        print(f"  {titulo}: {formatar_inteiro_br(hoje_v)}{sufixo}")
-
-    print("\nBloco 2 — Pendências (MB25 automático + planilha manual):")
-    print(f"  9. Pendências Atendimento Linhas: {formatar_inteiro_br(indicadores['pendencias_atendimento_linhas'])}")
-    print(f"  10. Reservas Pendentes: {formatar_inteiro_br(indicadores['reservas_pendentes'])}")
-    print(f"  11. Notas Aguardando Lançamento: {formatar_inteiro_br(manual_hoje['notas_aguardando_lancamento'])}")
-    print(f"  12. NF Pendente Faturamento: {formatar_inteiro_br(manual_hoje['nf_pendente_faturamento'])}")
-    print(f"  13. Devolução: {formatar_inteiro_br(manual_hoje['devolucao'])}")
-
-    print("\nBloco 3 — Fotografia do Estoque (ZMM028 automático, só D009):")
-    print(f"  14. Itens em Estoque com Saldo: {formatar_inteiro_br(indicadores['itens_estoque_com_saldo'])}")
-    print(f"  15. Valor do Estoque Total: R$ {formatar_valor_estoque_milhares(indicadores['valor_estoque_total'])} mil")
-    print(f"  16. Itens MRP Saldo Zero: {formatar_inteiro_br(indicadores['itens_mrp_saldo_zero'])}")
-    print("  17. Curva ABC: 30 (fixo)")
-    print(f"  18. Itens sem Endereço: {formatar_inteiro_br(indicadores['itens_sem_endereco'])}")
-
-    print("\nSoltos:")
-    print(f"  19. Intercompany (manual): {formatar_inteiro_br(manual_hoje['intercompany'])}")
-    print(f"  20. Scanner de Documentos (manual): {formatar_inteiro_br(manual_hoje['scanner_documentos'])}")
-
-    mes_chave = f"{hoje:%Y-%m}"
-    mes_dados = resumo_mes.get(mes_chave, {})
-    print(f"\nResumo do Mês ({mes_chave}):")
-    print(f"  Linhas atendidas no mês: {formatar_inteiro_br(mes_dados.get('linhas_atendidas_mes', 0))}")
-    print(f"  Valor atendido no mês: R$ {mes_dados.get('valor_atendido_mes', 0):,.2f}".replace(",", "@").replace(".", ",").replace("@", "."))
-    print(f"  Notas recebidas no mês: {formatar_inteiro_br(mes_dados.get('notas_recebidas_mes', 0))}")
-
-    print(f"\nPontos de Atenção ({len(pontos_avisos['pontos_atencao'])}):")
-    for item in pontos_avisos["pontos_atencao"]:
-        print(f"  - {item}")
-    print(f"Avisos Importantes ({len(pontos_avisos['avisos_importantes'])}):")
-    for item in pontos_avisos["avisos_importantes"]:
-        print(f"  - {item}")
-    print(f"Datas Importantes: {len(datas_importantes)} registro(s) na matriz de férias/ausências.")
-    print(linha)
+def _avisar_materiais_sem_preco_mm60(indicadores: dict) -> None:
+    """Alerta de qualidade de dado — a MM60 é a ÚNICA fonte de preço (ver
+    backend/config.MM60_DIR) e não tem cálculo alternativo automático quando falta
+    (ver indicadores.materiais_vb_sem_preco_mm60). Diferente do resumo de números
+    (removido — ninguém queria mais ver na tela antes de confirmar), isso continua
+    aparecendo sempre que houver material faltando, porque é acionável: sem isso, o
+    valor em R$ dos indicadores 1/2 (Gestão de Estoque) fica silenciosamente
+    incompleto até a planilha de referência ser atualizada."""
+    sem_preco = indicadores.get("materiais_vb_sem_preco_mm60") or []
+    if not sem_preco:
+        return
+    print(
+        f"\nALERTA — {len(sem_preco)} material(is) VB não encontrado(s) na MM60 "
+        "(considere atualizar a planilha de referência):"
+    )
+    print(f"  {', '.join(sem_preco)}")
 
 
 def _git(repo_root: str, *args: str) -> subprocess.CompletedProcess:
@@ -287,7 +246,12 @@ def executar(
         return 1
 
     print("Lendo planilhas e calculando os indicadores...")
-    indicadores = calcular_todos_indicadores(bases_dir=bases_dir, data_ref=data_forcada)
+    # MB51 (a maior das 3 planilhas do dia, ~40s pra ler sobre a rede) é carregada UMA
+    # VEZ aqui e reaproveitada tanto pros indicadores do dia quanto pro Resumo do Mês
+    # (historico_mensal) logo abaixo — antes disso, os dois liam o mesmo arquivo do
+    # zero cada um, dobrando à toa o tempo da etapa mais pesada do Cabeçalho.
+    df_mb51 = extratos.carregar_mb51(os.path.join(bases_dir, config.MB51_FILENAME))
+    indicadores = calcular_todos_indicadores(bases_dir=bases_dir, data_ref=data_forcada, df_mb51=df_mb51)
     hoje = datetime.date.fromisoformat(indicadores["data_referencia"])
 
     # Checa "já congelado?"/senha ANTES de mostrar qualquer resumo: uma senha errada
@@ -320,11 +284,9 @@ def executar(
     datas_importantes = planilha_manual.ler_datas_importantes(manual_path)
 
     inicio_mes = hoje.replace(day=1)
-    resumo_mes = historico_mensal.calcular_historico_mensal(
-        inicio_mes, hoje, arquivo_mb51=os.path.join(bases_dir, config.MB51_FILENAME)
-    )
+    resumo_mes = historico_mensal.calcular_historico_mensal(inicio_mes, hoje, df_mb51=df_mb51)
 
-    _imprimir_resumo(hoje, indicadores, manual_hoje, resumo_mes, pontos_avisos, datas_importantes)
+    _avisar_materiais_sem_preco_mm60(indicadores)
 
     if not _confirmar("\nPosso congelar?"):
         print("Ok, nada foi alterado.")
@@ -363,6 +325,7 @@ def executar(
         print(f"ERRO ao subir pro GitHub:\n{e}")
         return 1
 
+    print(f"\n✅ Tudo certo! Dia {hoje:%d/%m/%Y} processado e publicado com sucesso.")
     return 0
 
 

@@ -121,9 +121,17 @@ def calcular_historico_mensal(
     data_fim: datetime.date | None = None,
     bases_dir: str | None = None,
     arquivo_mb51: str | None = None,
+    df_mb51: pd.DataFrame | None = None,
 ) -> dict[str, dict]:
-    caminho_mb51 = arquivo_mb51 or os.path.join(bases_dir or config.BASES_DIR, config.MB51_FILENAME)
-    mb51 = extratos.carregar_mb51(caminho_mb51)
+    """`df_mb51`: opcional — passa a MB51 já carregada em memória (ver
+    backend/cabecalho.py) pra não reler o arquivo do disco. `main.calcular_todos_indicadores`
+    já carrega a MB51 pra calcular os outros indicadores do dia — sem isso, esse módulo
+    lia o MESMO arquivo (5,8MB/83 mil linhas) do zero de novo, ~40s à toa por execução."""
+    if df_mb51 is not None:
+        mb51 = df_mb51
+    else:
+        caminho_mb51 = arquivo_mb51 or os.path.join(bases_dir or config.BASES_DIR, config.MB51_FILENAME)
+        mb51 = extratos.carregar_mb51(caminho_mb51)
 
     if data_fim is None:
         datas = extratos.datas_disponiveis(mb51)

@@ -45,7 +45,21 @@ CAMPOS_MB51 = (
     "inventario_rotativo_d016",
 )
 
-CAMPOS_ZMM028 = ("itens_estoque_com_saldo", "itens_mrp_saldo_zero", "valor_estoque_total", "itens_sem_endereco")
+CAMPOS_ZMM028 = (
+    "itens_estoque_com_saldo",
+    "itens_mrp_saldo_zero",
+    "valor_estoque_total",
+    "itens_sem_endereco",
+    # Gestão de Estoque — indicadores 1 e 2 (o denominador comum "% do valor VB"
+    # entra aqui achatado também, pra o front-end não precisar recalcular por dia).
+    "total_materiais_vb_d009",
+    "materiais_abaixo_estoque_minimo_qtd",
+    "materiais_abaixo_estoque_minimo_valor_total",
+    "materiais_abaixo_estoque_minimo_pct_valor_vb",
+    "materiais_acima_estoque_maximo_qtd",
+    "materiais_acima_estoque_maximo_valor_total",
+    "materiais_acima_estoque_maximo_pct_valor_vb",
+)
 
 _STATUS_CLASSE = {
     "QUITADA": "done",
@@ -312,6 +326,13 @@ def congelar_dia(
     # topo do arquivo pra HISTORICO_PAINEIS vs painéis estáticos da tela Início).
     html_novo = atualizar_constante_historico_js(
         html_novo, "CHECKLIST_RESERVAS", {"rows": indicadores["checklist_reservas"]}
+    )
+
+    # Classificação de MRP (indicador 5, Gestão de Estoque): mesma lógica de
+    # "fotografia atual, sem histórico por data" do CHECKLIST_RESERVAS acima —
+    # sempre sobrescrita a cada congelamento.
+    html_novo = atualizar_constante_historico_js(
+        html_novo, "CLASSIFICACAO_MRP", indicadores["classificacao_mrp"]
     )
 
     html_novo = atualizar_painel_pontos_avisos(html_novo, pontos_atencao, avisos_importantes)

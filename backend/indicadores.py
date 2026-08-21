@@ -111,6 +111,148 @@ def itens_sem_endereco(df_zmm028: pd.DataFrame) -> int:
     return int(((_util_livre(df_zmm028) != 0) & pos_vazia).sum())
 
 
+# ---- Tela Gestão de Estoque (ZMM028 D009 + MM60) ----------------------------
+# Indicadores 1 e 2 (Materiais Abaixo do Estoque Mínimo / Acima do Estoque Máximo)
+# — mesmo recorte D009 dos indicadores 14/15/16/18 acima (df_zmm028_d009 vem de
+# extratos.carregar_zmm028). Precisam de preço médio (MM60) porque Val.total da
+# ZMM028 é saldo atual × preço — não dá pra usar pra valorar um gap hipotético
+# até o mínimo, nem funciona pra material zerado (saldo 0 × preço = 0).
+# _normalizar_material (Material '1500022' vs '1500022.0') já existe mais abaixo
+# neste módulo (usado pelo Checklist de Reservas) — reaproveitado aqui.
+
+def _mapa_preco_medio(df_mm60: pd.DataFrame) -> pd.Series:
+    """Series indexada por Material normalizado -> Preço (float). Material
+    duplicado (mais de um Centro na MM60) mantém o primeiro."""
+    materiais = _normalizar_material(df_mm60["Material"])
+    precos = pd.to_numeric(df_mm60["Preço"], errors="coerce").fillna(0)
+    tabela = pd.DataFrame({"_material_norm": materiais, "_preco": precos})
+    tabela = tabela.drop_duplicates(subset="_material_norm", keep="first")
+    return tabela.set_index("_material_norm")["_preco"]
+
+
+def _juntar_preco(df: pd.DataFrame, mapa_preco: pd.Series) -> pd.Series:
+    """Preço médio por linha de `df`, casado pelo Material. Material sem preço
+    cadastrado na MM60 entra como 0 — não descarta a linha, só não soma valor."""
+    materiais = _normalizar_material(df["Material"])
+    return materiais.map(mapa_preco).fillna(0)
+
+
+def resumo_vb(df_zmm028_d009: pd.DataFrame) -> tuple[int, float]:
+    """(quantidade de materiais VB, valor total em R$ dos materiais VB) — usado
+    como denominador comum do percentual dos indicadores 1/2 ("% do valor VB") e
+    do rótulo "Total de materiais (VB)" mostrado nos dois cards. Valor vem de
+    Val.total (já é saldo × preço), não precisa de MM60 aqui."""
+    tp_mrp = df_zmm028_d009["Tp.MRP"].astype(str).str.strip()
+    vb = df_zmm028_d009.loc[tp_mrp == "VB"]
+    valor_total = pd.to_numeric(vb["Val.total"], errors="coerce").fillna(0).sum()
+    return int(len(vb)), round(float(valor_total), 2)
+
+
+def materiais_vb_sem_preco_mm60(df_zmm028_d009: pd.DataFrame, df_mm60: pd.DataFrame) -> list[str]:
+    """Códigos de Material (VB, D009) que NÃO têm NENHUMA linha na MM60 — preço R$ 0,00
+    cadastrado na MM60 é um preço real e válido pra alguns materiais, não entra aqui,
+    só quem está mesmo ausente da planilha. Usado pro alerta do Cabeçalho: a MM60 é a
+    ÚNICA fonte de preço, sem cálculo alternativo automático quando falta (ver
+    materiais_abaixo_estoque_minimo/materiais_acima_estoque_maximo — o preço desses
+    materiais entra como 0 no valor total, não estimado)."""
+    tp_mrp = df_zmm028_d009["Tp.MRP"].astype(str).str.strip()
+    vb = df_zmm028_d009.loc[tp_mrp == "VB"]
+    materiais_vb = _normalizar_material(vb["Material"])
+    materiais_mm60 = set(_normalizar_material(df_mm60["Material"]))
+    faltando = materiais_vb.loc[~materiais_vb.isin(materiais_mm60)]
+    return sorted(faltando.unique().tolist())
+
+
+def materiais_abaixo_estoque_minimo(
+    df_zmm028_d009: pd.DataFrame, df_mm60: pd.DataFrame, valor_total_vb: float
+) -> dict:
+    """Depósito D009, Classificação MRP = VB. Entra na lista quem tem Util.livre
+    ESTRITAMENTE menor que Pt.reabast (saldo igual ao ponto de reabastecimento NÃO
+    entra). Valor total é o "gap" até o ponto de reabastecimento × preço médio
+    (MM60), sempre NEGATIVO (representa o déficit/quanto falta comprar).
+    `valor_total_vb` (Val.total somado dos materiais VB, ver resumo_vb) é o
+    denominador do percentual — passado de fora pra ser a MESMA base usada pelo
+    indicador 2, calculada uma única vez."""
+    tp_mrp = df_zmm028_d009["Tp.MRP"].astype(str).str.strip()
+    vb = df_zmm028_d009.loc[tp_mrp == "VB"]
+
+    util_livre = _util_livre(vb)
+    pt_reabast = pd.to_numeric(vb["Pt.reabast"], errors="coerce").fillna(0)
+    abaixo = vb.loc[util_livre < pt_reabast]
+
+    gap = pt_reabast.loc[abaixo.index] - util_livre.loc[abaixo.index]
+    preco = _juntar_preco(abaixo, _mapa_preco_medio(df_mm60))
+    valor_gap = float((gap * preco).sum())
+
+    pct_valor_vb = (valor_gap / valor_total_vb * 100) if valor_total_vb else 0.0
+
+    return {
+        "qtd": int(len(abaixo)),
+        "valor_total": round(-valor_gap, 2),
+        "pct_valor_vb": round(pct_valor_vb, 2),
+    }
+
+
+def materiais_acima_estoque_maximo(
+    df_zmm028_d009: pd.DataFrame, df_mm60: pd.DataFrame, valor_total_vb: float
+) -> dict:
+    """Classificação MRP = VB só (ND fica de fora mesmo que tenha Estq.máx.
+    preenchido por engano). "Saldo Atual" é Util.livre — único campo de saldo que
+    a ZMM028 tem. Entra na lista quem tem saldo ESTRITAMENTE maior que Estq.máx.
+    cadastrado. Valor total é o excesso acima do máximo × preço médio (MM60),
+    sempre POSITIVO (capital parado a mais). Mesmo `valor_total_vb` do indicador 1
+    como denominador do percentual."""
+    tp_mrp = df_zmm028_d009["Tp.MRP"].astype(str).str.strip()
+    vb = df_zmm028_d009.loc[tp_mrp == "VB"]
+
+    saldo = _util_livre(vb)
+    estq_max = pd.to_numeric(vb["Estq.máx."], errors="coerce").fillna(0)
+    acima = vb.loc[saldo > estq_max]
+
+    excesso = saldo.loc[acima.index] - estq_max.loc[acima.index]
+    preco = _juntar_preco(acima, _mapa_preco_medio(df_mm60))
+    valor_excesso = float((excesso * preco).sum())
+
+    pct_valor_vb = (valor_excesso / valor_total_vb * 100) if valor_total_vb else 0.0
+
+    return {
+        "qtd": int(len(acima)),
+        "valor_total": round(valor_excesso, 2),
+        "pct_valor_vb": round(pct_valor_vb, 2),
+    }
+
+
+_CLASSES_MRP_CONHECIDAS = ("VB", "ND", "PD")
+
+
+def classificacao_mrp(df_zmm028_todos_depositos: pd.DataFrame) -> dict:
+    """Indicador 5 — TODOS os materiais com saldo positivo (Util.livre > 0), TODOS
+    os depósitos (df_zmm028_todos_depositos vem de
+    extratos.carregar_zmm028_todos_depositos, sem o filtro D009 dos outros
+    indicadores da ZMM028). Agrupa por Tp.MRP em 4 baldes fixos (VB/ND/PD/Vazios —
+    qualquer valor fora de VB/ND/PD, inclusive em branco, cai em "Vazios"), sempre
+    nessa ordem, mesmo que algum balde fique zerado num dia. Valor de cada balde é
+    a soma de Val.total (já é saldo × preço, não precisa da MM60 aqui)."""
+    com_saldo = df_zmm028_todos_depositos.loc[_util_livre(df_zmm028_todos_depositos) > 0]
+
+    tp_mrp = com_saldo["Tp.MRP"].astype(str).str.strip()
+    classe = tp_mrp.where(tp_mrp.isin(_CLASSES_MRP_CONHECIDAS), "Vazios")
+    valor = pd.to_numeric(com_saldo["Val.total"], errors="coerce").fillna(0)
+
+    itens = []
+    for nome in (*_CLASSES_MRP_CONHECIDAS, "Vazios"):
+        selecao = classe == nome
+        itens.append(
+            {
+                "classe": nome,
+                "qtd": int(selecao.sum()),
+                "valor_total": round(float(valor.loc[selecao].sum()), 2),
+            }
+        )
+
+    return {"total": int(len(com_saldo)), "itens": itens}
+
+
 # ---- Tela Checklist de Reservas (MB25 x ZMM028) -----------------------------
 # Não é um indicador agregado como os de cima — é a lista completa de linhas de
 # reserva pendente (uma por linha do MB25), enriquecida com Saldo Atual/Endereço

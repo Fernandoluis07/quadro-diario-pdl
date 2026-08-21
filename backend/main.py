@@ -20,6 +20,8 @@ import datetime
 import json
 import os
 
+import pandas as pd
+
 from . import config, extratos, indicadores
 
 _CHAVES_BLOCO1 = (
@@ -74,14 +76,34 @@ def _calcular_bloco1(df_mb51, data: datetime.date) -> dict:
 def calcular_todos_indicadores(
     bases_dir: str | None = None,
     data_ref: datetime.date | None = None,
+    df_mb51: pd.DataFrame | None = None,
 ) -> dict:
+    """`df_mb51`: opcional — passa a MB51 já carregada em memória (ver
+    backend/cabecalho.py) pra não reler o arquivo do disco (~40s numa MB51 de 5,8MB/
+    83 mil linhas, sobre a rede). Sem isso, carrega do zero como sempre (uso normal:
+    CLI standalone, testes)."""
     bases_dir = bases_dir or config.BASES_DIR
 
-    mb51 = extratos.carregar_mb51(os.path.join(bases_dir, config.MB51_FILENAME))
+    mb51 = df_mb51 if df_mb51 is not None else extratos.carregar_mb51(os.path.join(bases_dir, config.MB51_FILENAME))
     mb25 = extratos.carregar_mb25(os.path.join(bases_dir, config.MB25_FILENAME))
-    zmm028 = extratos.carregar_zmm028(os.path.join(bases_dir, config.ZMM028_FILENAME))
+    # Lê a ZMM028 do disco UMA VEZ só (~780KB/12,5 mil linhas, ~5s de leitura sobre a
+    # rede) e deriva a versão D009 EM MEMÓRIA (instantâneo) — antes disso, carregar_zmm028
+    # e carregar_zmm028_todos_depositos liam o mesmo arquivo duas vezes, ~5s à toa em
+    # toda execução do Cabeçalho (ver extratos.filtrar_zmm028_d009).
+    zmm028_todos_depositos = extratos.carregar_zmm028_todos_depositos(os.path.join(bases_dir, config.ZMM028_FILENAME))
+    zmm028 = extratos.filtrar_zmm028_d009(zmm028_todos_depositos)
+    # MM60 é preço de REFERÊNCIA (atualizado esporadicamente por quem administra o
+    # Almoxarifado) — mora fixo dentro do repo (config.MM60_DIR), independente de
+    # `bases_dir`/--bases-dir, que só vale pras 3 planilhas trocadas todo dia.
+    mm60 = extratos.carregar_mm60(os.path.join(config.MM60_DIR, config.MM60_FILENAME))
 
     hoje, ontem = _detectar_hoje_ontem(mb51, data_ref)
+
+    # Gestão de Estoque — indicadores 1 e 2 dividem o mesmo denominador (qtd/valor
+    # dos materiais VB em D009), calculado uma única vez aqui.
+    qtd_total_vb, valor_total_vb = indicadores.resumo_vb(zmm028)
+    abaixo_minimo = indicadores.materiais_abaixo_estoque_minimo(zmm028, mm60, valor_total_vb)
+    acima_maximo = indicadores.materiais_acima_estoque_maximo(zmm028, mm60, valor_total_vb)
 
     resultado = {
         "data_referencia": hoje.isoformat(),
@@ -94,6 +116,15 @@ def calcular_todos_indicadores(
         "itens_mrp_saldo_zero": indicadores.itens_mrp_saldo_zero(zmm028),
         "itens_sem_endereco": indicadores.itens_sem_endereco(zmm028),
         "checklist_reservas": indicadores.montar_checklist_reservas(mb25, zmm028),
+        "total_materiais_vb_d009": qtd_total_vb,
+        "materiais_abaixo_estoque_minimo_qtd": abaixo_minimo["qtd"],
+        "materiais_abaixo_estoque_minimo_valor_total": abaixo_minimo["valor_total"],
+        "materiais_abaixo_estoque_minimo_pct_valor_vb": abaixo_minimo["pct_valor_vb"],
+        "materiais_acima_estoque_maximo_qtd": acima_maximo["qtd"],
+        "materiais_acima_estoque_maximo_valor_total": acima_maximo["valor_total"],
+        "materiais_acima_estoque_maximo_pct_valor_vb": acima_maximo["pct_valor_vb"],
+        "classificacao_mrp": indicadores.classificacao_mrp(zmm028_todos_depositos),
+        "materiais_vb_sem_preco_mm60": indicadores.materiais_vb_sem_preco_mm60(zmm028, mm60),
         "ontem": _calcular_bloco1(mb51, ontem) if ontem else None,
     }
     return resultado

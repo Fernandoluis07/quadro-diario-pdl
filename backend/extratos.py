@@ -90,6 +90,7 @@ def _filtrar_deposito_d009_vazio(df: pd.DataFrame) -> pd.DataFrame:
 _COLUNAS_MB51 = {"Material", "Depósito", "Tipo de movimento", "Data de lançamento", "Referência"}
 _COLUNAS_MB25 = {"Reserva", "Material", "Depósito"}
 _COLUNAS_ZMM028 = {"Material", "Depósito", "Util.livre", "Val.total", "Pos.dpst.", "Tp.MRP"}
+_COLUNAS_MM60 = {"Material", "Preço"}
 
 
 def carregar_mb51(caminho: str) -> pd.DataFrame:
@@ -108,11 +109,42 @@ def carregar_mb25(caminho: str) -> pd.DataFrame:
     return df
 
 
+def _carregar_zmm028_bruto(caminho: str) -> pd.DataFrame:
+    df = _ler_excel(caminho, _COLUNAS_ZMM028)
+    return _descartar_linhas_rodape(df)
+
+
 def carregar_zmm028(caminho: str) -> pd.DataFrame:
     """ZMM028 é um snapshot direto, mas os indicadores 14/15/16/18 (Itens em
     Estoque com Saldo, Valor do Estoque Total, Itens MRP Saldo Zero, Itens sem
-    Endereço) só devem considerar D009 — mesma regra de filtro do MB25."""
-    df = _ler_excel(caminho, _COLUNAS_ZMM028)
+    Endereço) e os indicadores 1/2 da tela Gestão de Estoque (Materiais Abaixo do
+    Estoque Mínimo/Acima do Máximo) só devem considerar D009 — mesma regra de
+    filtro do MB25. Ver carregar_zmm028_todos_depositos para o indicador 5
+    (Classificação de MRP), que precisa enxergar todos os depósitos."""
+    df = _carregar_zmm028_bruto(caminho)
+    return _filtrar_deposito_d009_vazio(df)
+
+
+def carregar_zmm028_todos_depositos(caminho: str) -> pd.DataFrame:
+    """Mesmo snapshot da ZMM028, SEM o filtro de depósito — usado só pelo indicador 5
+    (Classificação de MRP) da tela Gestão de Estoque, que é "sem filtro de depósito
+    específico" por definição de negócio (ao contrário de carregar_zmm028 acima)."""
+    return _carregar_zmm028_bruto(caminho)
+
+
+def filtrar_zmm028_d009(df_zmm028_todos_depositos: pd.DataFrame) -> pd.DataFrame:
+    """Aplica o mesmo filtro D009+vazio de carregar_zmm028, mas EM MEMÓRIA, sobre um
+    DataFrame já carregado (ver carregar_zmm028_todos_depositos) — pra quem precisa das
+    duas versões (indicador 5 x indicadores 1/2/14/15/16/18) não ler o arquivo do disco
+    duas vezes. Medido: ~5s por leitura da ZMM028 (12.491 linhas) — ler 2x custava ~5s à
+    toa em toda execução do Cabeçalho (ver backend/main.calcular_todos_indicadores)."""
+    return _filtrar_deposito_d009_vazio(df_zmm028_todos_depositos)
+
+
+def carregar_mm60(caminho: str) -> pd.DataFrame:
+    """Preço médio por material (aba 'Data' da MM60.xlsx: Material, Centro, Texto
+    breve material, Preço, Moeda) — sem filtro de depósito (a MM60 não tem coluna de
+    depósito; preço é por Material/Centro)."""
+    df = _ler_excel(caminho, _COLUNAS_MM60)
     df = _descartar_linhas_rodape(df)
-    df = _filtrar_deposito_d009_vazio(df)
     return df

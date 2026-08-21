@@ -202,3 +202,139 @@ def test_montar_checklist_reservas_normaliza_material_com_sufixo_float():
     linhas = indicadores.montar_checklist_reservas(mb25, zmm028)
     assert linhas[0]["material"] == "1500022"
     assert linhas[0]["saldo_atual"] == 9.0
+
+
+# ---- Tela Gestão de Estoque — Indicadores 1, 2 e 5 --------------------------
+
+def _zmm028_gestao(rows):
+    base = {"Material": "", "Util.livre": 0, "Val.total": 0.0, "Tp.MRP": "VB", "Pt.reabast": 0, "Estq.máx.": 0}
+    return pd.DataFrame([{**base, **r} for r in rows])
+
+
+def _mm60(rows):
+    return pd.DataFrame([{"Material": m, "Preço": p} for m, p in rows])
+
+
+def test_materiais_vb_sem_preco_mm60_ignora_preco_zero_valido():
+    """Material 2 tem R$ 0,00 cadastrado na MM60 — preço real e válido, não é 'sem
+    preço'. Material 3 não aparece na MM60 nenhuma — esse sim entra no alerta.
+    Material 4 é ND, fora do escopo (só VB entra)."""
+    zmm028 = _zmm028_gestao(
+        [
+            {"Material": "1", "Tp.MRP": "VB"},
+            {"Material": "2", "Tp.MRP": "VB"},
+            {"Material": "3", "Tp.MRP": "VB"},
+            {"Material": "4", "Tp.MRP": "ND"},
+        ]
+    )
+    mm60 = _mm60([("1", 10.0), ("2", 0.0)])
+    resultado = indicadores.materiais_vb_sem_preco_mm60(zmm028, mm60)
+    assert resultado == ["3"]
+
+
+def test_materiais_vb_sem_preco_mm60_vazio_quando_tudo_cadastrado():
+    zmm028 = _zmm028_gestao([{"Material": "1", "Tp.MRP": "VB"}])
+    mm60 = _mm60([("1", 10.0)])
+    assert indicadores.materiais_vb_sem_preco_mm60(zmm028, mm60) == []
+
+
+def test_materiais_abaixo_estoque_minimo_e_estrito_igual_nao_entra():
+    """Ponto de Reabastecimento 10, saldo 10 -> NÃO entra (não é estritamente menor).
+    Saldo 9 -> entra."""
+    zmm028 = _zmm028_gestao(
+        [
+            {"Material": "1", "Util.livre": 10, "Pt.reabast": 10, "Val.total": 100.0},
+            {"Material": "2", "Util.livre": 9, "Pt.reabast": 10, "Val.total": 90.0},
+        ]
+    )
+    mm60 = _mm60([("1", 10.0), ("2", 10.0)])
+    resultado = indicadores.materiais_abaixo_estoque_minimo(zmm028, mm60, valor_total_vb=190.0)
+    assert resultado["qtd"] == 1
+
+
+def test_materiais_abaixo_estoque_minimo_valor_e_gap_vezes_preco_negativo():
+    """Material 2: gap = Pt.reabast(10) - Util.livre(4) = 6, preço 15 -> -90.0."""
+    zmm028 = _zmm028_gestao([{"Material": "2", "Util.livre": 4, "Pt.reabast": 10, "Val.total": 60.0}])
+    mm60 = _mm60([("2", 15.0)])
+    resultado = indicadores.materiais_abaixo_estoque_minimo(zmm028, mm60, valor_total_vb=60.0)
+    assert resultado["valor_total"] == -90.0
+    # pct_valor_vb é magnitude (sem sinal) — só valor_total carrega o sinal negativo
+    assert resultado["pct_valor_vb"] == 150.0  # 90/60*100
+
+
+def test_materiais_abaixo_estoque_minimo_material_zerado_usa_preco_mm60_nao_val_total():
+    """Saldo 0 -> Val.total também é 0 (0 x preço); o gap tem que usar o preço da
+    MM60, não Val.total/Util.livre (que daria 0/0)."""
+    zmm028 = _zmm028_gestao([{"Material": "1", "Util.livre": 0, "Pt.reabast": 5, "Val.total": 0.0}])
+    mm60 = _mm60([("1", 20.0)])
+    resultado = indicadores.materiais_abaixo_estoque_minimo(zmm028, mm60, valor_total_vb=1.0)
+    assert resultado["qtd"] == 1
+    assert resultado["valor_total"] == -100.0  # gap 5 * preço 20
+
+
+def test_materiais_abaixo_estoque_minimo_ignora_material_sem_preco_na_mm60():
+    """Material fora da MM60 conta na quantidade, mas soma 0 ao valor (não quebra)."""
+    zmm028 = _zmm028_gestao([{"Material": "999", "Util.livre": 0, "Pt.reabast": 5, "Val.total": 0.0}])
+    mm60 = _mm60([("1", 20.0)])
+    resultado = indicadores.materiais_abaixo_estoque_minimo(zmm028, mm60, valor_total_vb=1.0)
+    assert resultado["qtd"] == 1
+    assert resultado["valor_total"] == 0.0
+
+
+def test_materiais_acima_estoque_maximo_estrito_igual_nao_entra_e_exclui_nd():
+    """Saldo igual ao máximo não entra; ND é excluído mesmo com Estq.máx. preenchido."""
+    zmm028 = _zmm028_gestao(
+        [
+            {"Material": "1", "Util.livre": 50, "Estq.máx.": 50, "Val.total": 500.0, "Tp.MRP": "VB"},
+            {"Material": "2", "Util.livre": 60, "Estq.máx.": 50, "Val.total": 600.0, "Tp.MRP": "VB"},
+            {"Material": "3", "Util.livre": 999, "Estq.máx.": 10, "Val.total": 9990.0, "Tp.MRP": "ND"},
+        ]
+    )
+    mm60 = _mm60([("1", 10.0), ("2", 10.0), ("3", 10.0)])
+    resultado = indicadores.materiais_acima_estoque_maximo(zmm028, mm60, valor_total_vb=1100.0)
+    assert resultado["qtd"] == 1  # só o material 2 (VB, 60 > 50)
+
+
+def test_materiais_acima_estoque_maximo_valor_e_excesso_vezes_preco_positivo():
+    """Material: excesso = 60 - 50 = 10, preço 12 -> +120.0 (positivo)."""
+    zmm028 = _zmm028_gestao([{"Material": "1", "Util.livre": 60, "Estq.máx.": 50, "Val.total": 600.0}])
+    mm60 = _mm60([("1", 12.0)])
+    resultado = indicadores.materiais_acima_estoque_maximo(zmm028, mm60, valor_total_vb=600.0)
+    assert resultado["valor_total"] == 120.0
+    assert resultado["pct_valor_vb"] == 20.0  # 120/600*100
+
+
+def test_classificacao_mrp_agrupa_por_classe_e_manda_zero_e_negativo_pra_fora():
+    """Saldo <= 0 não entra em nenhum balde; Tp.MRP em branco cai em 'Vazios';
+    depósito D016 entra (indicador 5 não filtra depósito)."""
+    df = pd.DataFrame(
+        [
+            {"Material": "1", "Util.livre": 10, "Val.total": 100.0, "Tp.MRP": "VB", "Depósito": "D009"},
+            {"Material": "2", "Util.livre": 5, "Val.total": 50.0, "Tp.MRP": "ND", "Depósito": "D016"},
+            {"Material": "3", "Util.livre": 2, "Val.total": 20.0, "Tp.MRP": "PD", "Depósito": "D028"},
+            {"Material": "4", "Util.livre": 1, "Val.total": 10.0, "Tp.MRP": "", "Depósito": "D009"},
+            {"Material": "5", "Util.livre": 0, "Val.total": 0.0, "Tp.MRP": "VB", "Depósito": "D009"},
+            {"Material": "6", "Util.livre": -3, "Val.total": -30.0, "Tp.MRP": "VB", "Depósito": "D009"},
+        ]
+    )
+    resultado = indicadores.classificacao_mrp(df)
+    assert resultado["total"] == 4  # materiais 1,2,3,4 (saldo 0 e negativo ficam fora)
+    itens_por_classe = {i["classe"]: i for i in resultado["itens"]}
+    assert set(itens_por_classe) == {"VB", "ND", "PD", "Vazios"}
+    assert itens_por_classe["VB"] == {"classe": "VB", "qtd": 1, "valor_total": 100.0}
+    assert itens_por_classe["ND"] == {"classe": "ND", "qtd": 1, "valor_total": 50.0}
+    assert itens_por_classe["PD"] == {"classe": "PD", "qtd": 1, "valor_total": 20.0}
+    assert itens_por_classe["Vazios"] == {"classe": "Vazios", "qtd": 1, "valor_total": 10.0}
+
+
+def test_resumo_vb_conta_e_soma_so_classificacao_vb():
+    df = _zmm028_gestao(
+        [
+            {"Material": "1", "Val.total": 100.0, "Tp.MRP": "VB"},
+            {"Material": "2", "Val.total": 200.0, "Tp.MRP": "VB"},
+            {"Material": "3", "Val.total": 999.0, "Tp.MRP": "ND"},
+        ]
+    )
+    qtd, valor = indicadores.resumo_vb(df)
+    assert qtd == 2
+    assert valor == 300.0
