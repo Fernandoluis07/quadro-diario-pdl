@@ -833,5 +833,18 @@
     "materiais_acima_estoque_maximo_qtd": 1267,
     "materiais_acima_estoque_maximo_valor_total": 4566687.88,
     "materiais_acima_estoque_maximo_pct_valor_vb": 28.48
+  },
+  "2026-08-20": {
+    "itens_estoque_com_saldo": 5326,
+    "itens_mrp_saldo_zero": 181,
+    "valor_estoque_total": 28328574.27,
+    "itens_sem_endereco": 0,
+    "total_materiais_vb_d009": 2818,
+    "materiais_abaixo_estoque_minimo_qtd": 311,
+    "materiais_abaixo_estoque_minimo_valor_total": -1143202.74,
+    "materiais_abaixo_estoque_minimo_pct_valor_vb": 7.03,
+    "materiais_acima_estoque_maximo_qtd": 1271,
+    "materiais_acima_estoque_maximo_valor_total": 4571202.61,
+    "materiais_acima_estoque_maximo_pct_valor_vb": 28.12
   }
 }
