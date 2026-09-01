@@ -7786,5 +7786,54 @@
         "statusClasse": "scheduled"
       }
     ]
+  },
+  "2026-09-01": {
+    "pontos_atencao": [
+      "Estorno de materiais para o estoque, somente com chamado aprovado.",
+      "Segurança não se negocia, você tem alguém te esperando em casa."
+    ],
+    "avisos_importantes": [
+      "LEVISK 02 NOTAS",
+      "SAMDREB (CROW) 02 NOTAS",
+      "APP 03 NOTAS"
+    ],
+    "datas_importantes": [
+      {
+        "name": "Luiz Sergio",
+        "period": "23/03/26 a 05/04/26 · 14 dias",
+        "statusLabel": "Quitada",
+        "statusClasse": "done"
+      },
+      {
+        "name": "Geovane Abreu",
+        "period": "10/08/26 a 16/08/26 · 6 dias",
+        "statusLabel": "Quitada",
+        "statusClasse": "done"
+      },
+      {
+        "name": "Fernando Luis",
+        "period": "17/08/26 a 05/09/26 · 20 dias",
+        "statusLabel": "Programada",
+        "statusClasse": "scheduled"
+      },
+      {
+        "name": "Luiz Sergio",
+        "period": "14/09/26 a 29/09/26 · 16 dias",
+        "statusLabel": "Programada",
+        "statusClasse": "scheduled"
+      },
+      {
+        "name": "Geovane Abreu",
+        "period": "04/01/27 a 27/01/27 · 24 dias",
+        "statusLabel": "Programada",
+        "statusClasse": "scheduled"
+      },
+      {
+        "name": "Milton Junior",
+        "period": "28/12/26 a 16/01/27 · 20 dias",
+        "statusLabel": "Programada",
+        "statusClasse": "scheduled"
+      }
+    ]
   }
 }

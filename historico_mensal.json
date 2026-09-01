@@ -168,5 +168,23 @@
     "inventario_rotativo_mes": 1156,
     "estornos_qtd_mes": 46,
     "estornos_valor_mes": 260272.79
+  },
+  "2026-09": {
+    "linhas_atendidas_mes": 4,
+    "valor_atendido_mes": -385.94,
+    "reservas_mes": 4,
+    "ordens_mes": 0,
+    "outros_mes": 0,
+    "top5_centro_custo": [
+      {
+        "centro_custo": "2003REC",
+        "qtd": 4
+      }
+    ],
+    "notas_recebidas_mes": 0,
+    "valor_recebido_mes": 0.0,
+    "inventario_rotativo_mes": 4,
+    "estornos_qtd_mes": 0,
+    "estornos_valor_mes": 0.0
   }
 }

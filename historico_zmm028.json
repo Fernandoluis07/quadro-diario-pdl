@@ -952,5 +952,22 @@
     "materiais_nunca_movimentados_valor_total": 4905063.12,
     "materiais_nunca_movimentados_pct_valor_vb": 30.19,
     "materiais_nunca_movimentados_pct_distribuicao": 17.51
+  },
+  "2026-09-01": {
+    "itens_estoque_com_saldo": 5293,
+    "itens_mrp_saldo_zero": 193,
+    "valor_estoque_total": 27882955.39,
+    "itens_sem_endereco": 0,
+    "total_materiais_vb_d009": 2810,
+    "materiais_abaixo_estoque_minimo_qtd": 329,
+    "materiais_abaixo_estoque_minimo_valor_total": -1364481.5,
+    "materiais_abaixo_estoque_minimo_pct_valor_vb": 8.5,
+    "materiais_acima_estoque_maximo_qtd": 1260,
+    "materiais_acima_estoque_maximo_valor_total": 4575607.32,
+    "materiais_acima_estoque_maximo_pct_valor_vb": 28.51,
+    "materiais_nunca_movimentados_qtd": 492,
+    "materiais_nunca_movimentados_valor_total": 4905063.12,
+    "materiais_nunca_movimentados_pct_valor_vb": 30.56,
+    "materiais_nunca_movimentados_pct_distribuicao": 17.51
   }
 }
