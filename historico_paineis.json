@@ -7794,7 +7794,8 @@
     ],
     "avisos_importantes": [
       "TELOG 94 NOTAS",
-      "CARVALIMA 06 NOTAS"
+      "CARVALIMA 06 NOTAS",
+      "LUMI 01 NOTA"
     ],
     "datas_importantes": [
       {
@@ -7824,6 +7825,12 @@
       {
         "name": "Geovane Abreu",
         "period": "04/01/27 a 27/01/27 · 24 dias",
+        "statusLabel": "Programada",
+        "statusClasse": "scheduled"
+      },
+      {
+        "name": "Luan Okada",
+        "period": "14/02/26 a 03/01/27 · 20 dias",
         "statusLabel": "Programada",
         "statusClasse": "scheduled"
       },
