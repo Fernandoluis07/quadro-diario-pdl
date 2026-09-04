@@ -170,37 +170,37 @@
     "estornos_valor_mes": 260272.79
   },
   "2026-09": {
-    "linhas_atendidas_mes": 104,
-    "valor_atendido_mes": -59383.36,
-    "reservas_mes": 64,
-    "ordens_mes": 38,
+    "linhas_atendidas_mes": 135,
+    "valor_atendido_mes": -64279.58,
+    "reservas_mes": 93,
+    "ordens_mes": 40,
     "outros_mes": 2,
     "top5_centro_custo": [
       {
         "centro_custo": "2003ADM",
-        "qtd": 17
+        "qtd": 19
       },
       {
         "centro_custo": "2003REC",
-        "qtd": 11
+        "qtd": 17
       },
       {
         "centro_custo": "2003UTL",
-        "qtd": 11
+        "qtd": 12
       },
       {
         "centro_custo": "2003PRD",
-        "qtd": 8
+        "qtd": 10
       },
       {
-        "centro_custo": "2003PJT",
-        "qtd": 6
+        "centro_custo": "2003ELA",
+        "qtd": 10
       }
     ],
-    "notas_recebidas_mes": 7,
-    "valor_recebido_mes": 51843.91,
-    "inventario_rotativo_mes": 105,
-    "estornos_qtd_mes": 2,
+    "notas_recebidas_mes": 37,
+    "valor_recebido_mes": 162210.37,
+    "inventario_rotativo_mes": 168,
+    "estornos_qtd_mes": 3,
     "estornos_valor_mes": 15916.26
   }
 }
