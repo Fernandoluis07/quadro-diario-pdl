@@ -1605,6 +1605,17 @@
     "inventario_rotativo_d016": 0,
     "intercompany": 0
   },
+  "2026-08-31": {
+    "linhas_atendidas_d009": 56,
+    "linhas_atendidas_d016": 0,
+    "estornos_d009": 0,
+    "estornos_d016": 0,
+    "recebimentos_d009": 3,
+    "recebimentos_d016": 0,
+    "inventario_rotativo_d009": 56,
+    "inventario_rotativo_d016": 0,
+    "intercompany": 0
+  },
   "2026-09-01": {
     "linhas_atendidas_d009": 45,
     "linhas_atendidas_d016": 0,
@@ -1636,6 +1647,28 @@
     "recebimentos_d016": 1,
     "inventario_rotativo_d009": 63,
     "inventario_rotativo_d016": 2,
+    "intercompany": 0
+  },
+  "2026-09-04": {
+    "linhas_atendidas_d009": 54,
+    "linhas_atendidas_d016": 0,
+    "estornos_d009": 0,
+    "estornos_d016": 0,
+    "recebimentos_d009": 18,
+    "recebimentos_d016": 1,
+    "inventario_rotativo_d009": 64,
+    "inventario_rotativo_d016": 1,
+    "intercompany": 2
+  },
+  "2026-09-05": {
+    "linhas_atendidas_d009": 0,
+    "linhas_atendidas_d016": 0,
+    "estornos_d009": 0,
+    "estornos_d016": 0,
+    "recebimentos_d009": 20,
+    "recebimentos_d016": 0,
+    "inventario_rotativo_d009": 21,
+    "inventario_rotativo_d016": 0,
     "intercompany": 0
   },
   "2026-09-07": {
@@ -1735,17 +1768,6 @@
     "recebimentos_d016": 0,
     "inventario_rotativo_d009": 46,
     "inventario_rotativo_d016": 0,
-    "intercompany": 1
-  },
-  "2026-09-18": {
-    "linhas_atendidas_d009": 0,
-    "linhas_atendidas_d016": 0,
-    "estornos_d009": 0,
-    "estornos_d016": 0,
-    "recebimentos_d009": 0,
-    "recebimentos_d016": 0,
-    "inventario_rotativo_d009": 1,
-    "inventario_rotativo_d016": 1,
     "intercompany": 1
   }
 }

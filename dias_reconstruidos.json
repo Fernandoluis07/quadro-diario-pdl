@@ -1,0 +1,50 @@
+{
+  "2026-08-31": {
+    "metodo": "ZMM028 do snapshot mais recente com os movimentos da MB51 posteriores ao dia desfeitos",
+    "snapshot": "2026-09-17",
+    "gerado_em": "2026-09-18T13:50:12",
+    "campos_aproximados": [
+      "itens_sem_endereco",
+      "itens_mrp_saldo_zero",
+      "materiais_abaixo_estoque_minimo_*",
+      "materiais_acima_estoque_maximo_*",
+      "materiais_nunca_movimentados_*"
+    ],
+    "sem_fonte_retroativa": [
+      "historico_manuais",
+      "historico_paineis"
+    ]
+  },
+  "2026-09-04": {
+    "metodo": "ZMM028 do snapshot mais recente com os movimentos da MB51 posteriores ao dia desfeitos",
+    "snapshot": "2026-09-17",
+    "gerado_em": "2026-09-18T13:50:12",
+    "campos_aproximados": [
+      "itens_sem_endereco",
+      "itens_mrp_saldo_zero",
+      "materiais_abaixo_estoque_minimo_*",
+      "materiais_acima_estoque_maximo_*",
+      "materiais_nunca_movimentados_*"
+    ],
+    "sem_fonte_retroativa": [
+      "historico_manuais",
+      "historico_paineis"
+    ]
+  },
+  "2026-09-05": {
+    "metodo": "ZMM028 do snapshot mais recente com os movimentos da MB51 posteriores ao dia desfeitos",
+    "snapshot": "2026-09-17",
+    "gerado_em": "2026-09-18T13:50:12",
+    "campos_aproximados": [
+      "itens_sem_endereco",
+      "itens_mrp_saldo_zero",
+      "materiais_abaixo_estoque_minimo_*",
+      "materiais_acima_estoque_maximo_*",
+      "materiais_nunca_movimentados_*"
+    ],
+    "sem_fonte_retroativa": [
+      "historico_manuais",
+      "historico_paineis"
+    ]
+  }
+}
