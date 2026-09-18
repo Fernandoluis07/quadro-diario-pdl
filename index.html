@@ -1970,6 +1970,7 @@ document.getElementById('resumoMesSelect').addEventListener('change', renderResu
    sem inventar dado futuro (mesma garantia de sempre). */
 function diasDoMesZmm028(chaveMes){
   const chavesGlobais = Object.keys(HISTORICO_ZMM028).sort();
+  const ultimaChaveReal = chavesGlobais[chavesGlobais.length - 1] || '';
   const primeiroDiaMes = `${chaveMes}-01`;
 
   // semente: valor real mais recente ANTES do mês pedido (mês anterior), pro caso do mês
@@ -1995,7 +1996,11 @@ function diasDoMesZmm028(chaveMes){
       valores.push(ultimoValor);
       continue;
     }
-    if(temValorReal && isWeekend(new Date(anoMes, mesMesNum - 1, dia))){
+    /* repete o último valor conhecido em (a) fim de semana e (b) QUALQUER dia sem chave que venha
+       ANTES do último dado real do histórico inteiro — buraco no meio (feriado sem extração, dia
+       que ninguém congelou) não pode mais cortar o resto do mês (BUG 3, 2026-09-18). O `break`
+       vale só pra dia DEPOIS da última chave real: aí é futuro/não processado, não se inventa dado. */
+    if(temValorReal && (isWeekend(new Date(anoMes, mesMesNum - 1, dia)) || iso < ultimaChaveReal)){
       valores.push(ultimoValor);
       continue;
     }
