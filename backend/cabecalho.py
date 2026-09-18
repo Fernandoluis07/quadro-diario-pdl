@@ -50,7 +50,7 @@ import os
 import subprocess
 import sys
 
-from . import config, congelar, extratos, historico_mensal, planilha_manual
+from . import config, congelar, extratos, historico_mensal, planilha_manual, saude
 from .main import _parse_data, calcular_todos_indicadores
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -109,6 +109,32 @@ def _avisar_materiais_sem_preco_mm60(indicadores: dict) -> None:
         "(considere atualizar a planilha de referência):"
     )
     print(f"  {', '.join(sem_preco)}")
+
+
+def _confirmar_continuar() -> bool:
+    return input("Digite CONTINUAR (em maiúsculas) para congelar mesmo assim: ").strip() == "CONTINUAR"
+
+
+def _alertar_saude(bases_dir, manual_path, hoje, df_mb51, historico_mb51, final: bool = False) -> list[dict]:
+    """Imprime o banner de alertas (nunca em log escondido), grava alertas_saude.js pro site
+    e devolve os alertas que BLOQUEIAM o congelamento de `hoje` (vazio se `final`). Falha
+    do próprio verificador é mostrada na tela — o alarme não pode falhar em silêncio."""
+    agora = datetime.datetime.now()
+    try:
+        bloqueios: list[dict] = []
+        if not final:
+            datas = {d for d in extratos.datas_disponiveis(df_mb51) if d is not None}
+            bloqueios = saude.checar_antes_de_congelar(hoje, df_mb51, historico_mb51, agora, datas) if historico_mb51 else \
+                saude.checar_dia_em_aberto(hoje, agora)
+        gerais = saude.verificar(repo_root=REPO_ROOT, bases_dir=bases_dir, agora=agora, mb51=df_mb51)
+        codigos = {b["codigo"] for b in bloqueios}
+        todos = bloqueios + [a for a in gerais if a["codigo"] not in codigos]
+        saude.imprimir(saude.formatar_banner(todos))
+        saude.gravar_alertas_js(REPO_ROOT, gerais, agora)
+        return bloqueios
+    except Exception as e:  # noqa: BLE001 — o verificador nunca pode derrubar o Cabeçalho, mas TEM que avisar
+        saude.imprimir(f"!! NÃO CONSEGUI VERIFICAR A SAÚDE DO SISTEMA ({type(e).__name__}: {e}) — avise quem mantém o projeto.")
+        return []
 
 
 def _git(repo_root: str, *args: str) -> subprocess.CompletedProcess:
@@ -257,12 +283,20 @@ def executar(
     indicadores = calcular_todos_indicadores(bases_dir=bases_dir, data_ref=data_forcada, df_mb51=df_mb51)
     hoje = datetime.date.fromisoformat(indicadores["data_referencia"])
 
+    caminho_mb51_json = os.path.join(REPO_ROOT, "historico_mb51.json")
+
+    # Alertas de saúde (backend/saude.py) — ANTES de qualquer outra pergunta. Dia em aberto,
+    # dia pulado e dia fora de sequência BLOQUEIAM: só segue digitando CONTINUAR.
+    bloqueios = _alertar_saude(bases_dir, manual_path, hoje, df_mb51, congelar._carregar_json(caminho_mb51_json))
+    if bloqueios and not _confirmar_continuar():
+        print("Ok, nada foi alterado.")
+        return 1
+
     # Checa "já congelado?"/senha ANTES de mostrar qualquer resumo: uma senha errada
     # tem que travar a execução imediatamente, sem imprimir nada que pareça sucesso
     # (ver backend/cabecalho.py — bug diagnosticado 2026-08-12/13, resumo era
     # mostrado antes da senha e por isso parecia ter funcionado mesmo quando não
     # gravava nada).
-    caminho_mb51_json = os.path.join(REPO_ROOT, "historico_mb51.json")
     forcar = False
     if congelar.ja_congelado(congelar._carregar_json(caminho_mb51_json), hoje.isoformat()):
         print(f"O dia {hoje:%d/%m/%Y} já tinha sido congelado antes.")
@@ -329,6 +363,7 @@ def executar(
         return 1
 
     print(f"\n✅ Tudo certo! Dia {hoje:%d/%m/%Y} processado e publicado com sucesso.")
+    _alertar_saude(bases_dir, manual_path, None, df_mb51, None, final=True)
     return 0
 
 

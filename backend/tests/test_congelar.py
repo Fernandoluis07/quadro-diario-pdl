@@ -1,5 +1,6 @@
 import datetime
 import json
+import os
 
 import pytest
 
@@ -426,3 +427,37 @@ def test_congelar_dia_com_forcar_sobrescreve_dia_ja_congelado(tmp_path):
     assert resultado["data"] == "2026-08-10"
     historico_mb51 = json.loads((tmp_path / "historico_mb51.json").read_text(encoding="utf-8"))
     assert historico_mb51["2026-08-10"]["linhas_atendidas_d009"] == 999
+
+
+# ---- remover_dia ----------------------------------------------------------------
+
+def _repo_com_dois_dias(tmp_path):
+    for nome, chave in (("mb51", "a"), ("manuais", "b"), ("zmm028", "c"), ("paineis", "d")):
+        (tmp_path / f"historico_{nome}.json").write_text(json.dumps({"2026-09-17": {chave: 1}, "2026-09-18": {chave: 2}}))
+    linhas = [f'const {c} = {{"2026-09-17":{{"k":1}},"2026-09-18":{{"k":2}}}};'
+              for c in ("HISTORICO_MB51", "HISTORICO_MANUAL", "HISTORICO_ZMM028", "HISTORICO_PAINEIS")]
+    html = os.linesep.join(["x", *linhas, "y"]) + os.linesep
+    (tmp_path / "index.html").write_text(html, encoding="utf-8")
+    return str(tmp_path), str(tmp_path / "index.html")
+
+
+def test_remover_dia_tira_o_ultimo_dia_dos_4_json_e_das_4_constantes(tmp_path):
+    repo, index = _repo_com_dois_dias(tmp_path)
+    congelar.remover_dia(repo, index, "2026-09-18")
+
+    for nome in ("mb51", "manuais", "zmm028", "paineis"):
+        assert list(json.loads((tmp_path / f"historico_{nome}.json").read_text())) == ["2026-09-17"]
+    html = (tmp_path / "index.html").read_text(encoding="utf-8")
+    assert "2026-09-18" not in html and html.count('"2026-09-17"') == 4
+
+
+def test_remover_dia_recusa_dia_do_meio_e_dia_inexistente_sem_alterar_nada(tmp_path):
+    repo, index = _repo_com_dois_dias(tmp_path)
+    antes = (tmp_path / "index.html").read_text(encoding="utf-8")
+    with pytest.raises(ValueError, match="Só o último"):
+        congelar.remover_dia(repo, index, "2026-09-17")
+    with pytest.raises(ValueError, match="não está congelado"):
+        congelar.remover_dia(repo, index, "2026-09-30")
+    assert (tmp_path / "index.html").read_text(encoding="utf-8") == antes
+    assert "2026-09-18" in (tmp_path / "historico_mb51.json").read_text()
+

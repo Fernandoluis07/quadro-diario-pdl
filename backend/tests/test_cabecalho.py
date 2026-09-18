@@ -107,6 +107,57 @@ def _isolar_repo_root(tmp_path, monkeypatch):
     return tmp_path
 
 
+# A MB51 sintética tem movimento em 09/08 e 10/08 — um histórico "consistente" precisa ter
+# os DOIS congelados, senão o alerta de dia pulado (backend/saude.py) barra o teste com razão.
+_HISTORICO_CONSISTENTE = {
+    "2026-08-09": {"linhas_atendidas_d009": 0, "intercompany": 0},
+    "2026-08-10": {"linhas_atendidas_d009": 0},
+}
+
+
+def test_executar_bloqueia_dia_pulado_e_so_segue_digitando_continuar(tmp_path, monkeypatch, capsys):
+    bases_dir, manual_path = _preparar_bases(tmp_path)
+    index_path = _preparar_index(tmp_path)
+    # 09/08 tem movimento na MB51 mas nunca foi congelado; só 07/08 está no histórico
+    (tmp_path / "historico_mb51.json").write_text(json.dumps({"2026-08-07": {"linhas_atendidas_d009": 0}}), encoding="utf-8")
+
+    monkeypatch.setattr("builtins.input", lambda _: "nao")
+    codigo = cabecalho.executar(bases_dir=bases_dir, manual_path=manual_path, index_path=index_path)
+
+    saida = capsys.readouterr().out
+    assert codigo == 1
+    assert "nunca foram congelados: 09/08" in saida
+    assert json.loads((tmp_path / "historico_mb51.json").read_text(encoding="utf-8")) == {"2026-08-07": {"linhas_atendidas_d009": 0}}
+
+
+def test_executar_bloqueia_congelar_o_dia_de_hoje_que_ainda_nao_acabou(tmp_path, monkeypatch, capsys):
+    bases_dir, manual_path = _preparar_bases(tmp_path)
+    index_path = _preparar_index(tmp_path)
+    hoje = datetime.date.today()
+    linha = _linha_mb51("1001", "D009", 201, hoje.strftime("%d.%m.%Y"), "NF-9", valor=5.0)
+    pd.DataFrame([linha]).to_excel(f"{bases_dir}/{config.MB51_FILENAME}", index=False)
+
+    monkeypatch.setattr("builtins.input", lambda _: "n")
+    codigo = cabecalho.executar(bases_dir=bases_dir, manual_path=manual_path, index_path=index_path)
+
+    assert codigo == 1
+    assert "AINDA NÃO ACABOU" in capsys.readouterr().out
+    assert not (tmp_path / "historico_mb51.json").exists()
+
+
+def test_executar_continua_quando_usuario_digita_continuar_no_bloqueio(tmp_path, monkeypatch):
+    bases_dir, manual_path = _preparar_bases(tmp_path)
+    index_path = _preparar_index(tmp_path)
+    (tmp_path / "historico_mb51.json").write_text(json.dumps({"2026-08-07": {"linhas_atendidas_d009": 0}}), encoding="utf-8")
+
+    respostas = iter(["CONTINUAR", "s", "n"])  # override do alerta, "Posso congelar?", "Posso subir?"
+    monkeypatch.setattr("builtins.input", lambda _: next(respostas))
+    codigo = cabecalho.executar(bases_dir=bases_dir, manual_path=manual_path, index_path=index_path)
+
+    assert codigo == 0
+    assert "2026-08-10" in json.loads((tmp_path / "historico_mb51.json").read_text(encoding="utf-8"))
+
+
 def test_checar_arquivos_lista_o_que_falta(tmp_path):
     faltando = cabecalho._checar_arquivos(str(tmp_path), str(tmp_path / "manual.xlsx"))
     assert len(faltando) == 7  # mb51, mb25, ZMM028, MM60, saldo âncora D009, saldo âncora D016, planilha manual
@@ -189,7 +240,7 @@ def test_executar_erro_quando_planilha_manual_nao_tem_linha_para_hoje(tmp_path, 
 def test_executar_recusa_congelar_dia_ja_congelado(tmp_path, monkeypatch):
     bases_dir, manual_path = _preparar_bases(tmp_path)
     index_path = _preparar_index(tmp_path)
-    (tmp_path / "historico_mb51.json").write_text(json.dumps({"2026-08-10": {"linhas_atendidas_d009": 0}}), encoding="utf-8")
+    (tmp_path / "historico_mb51.json").write_text(json.dumps(_HISTORICO_CONSISTENTE), encoding="utf-8")
 
     # "n" pra "Quer forçar o reprocessamento?" — pergunta antes de qualquer resumo,
     # então nem chega a perguntar "Posso congelar?" nem a pedir senha.
@@ -199,13 +250,13 @@ def test_executar_recusa_congelar_dia_ja_congelado(tmp_path, monkeypatch):
     assert codigo == 0
     # não deve ter sobrescrito o JSON existente
     historico = json.loads((tmp_path / "historico_mb51.json").read_text(encoding="utf-8"))
-    assert historico == {"2026-08-10": {"linhas_atendidas_d009": 0}}
+    assert historico == _HISTORICO_CONSISTENTE
 
 
 def test_executar_recusa_forcar_com_senha_errada(tmp_path, monkeypatch):
     bases_dir, manual_path = _preparar_bases(tmp_path)
     index_path = _preparar_index(tmp_path)
-    (tmp_path / "historico_mb51.json").write_text(json.dumps({"2026-08-10": {"linhas_atendidas_d009": 0}}), encoding="utf-8")
+    (tmp_path / "historico_mb51.json").write_text(json.dumps(_HISTORICO_CONSISTENTE), encoding="utf-8")
 
     # "s" pra "Quer forçar?" — senha errada barra o resto antes de qualquer resumo
     # ser mostrado (não chega a perguntar "Posso congelar?").
@@ -215,13 +266,13 @@ def test_executar_recusa_forcar_com_senha_errada(tmp_path, monkeypatch):
 
     assert codigo == 0
     historico = json.loads((tmp_path / "historico_mb51.json").read_text(encoding="utf-8"))
-    assert historico == {"2026-08-10": {"linhas_atendidas_d009": 0}}
+    assert historico == _HISTORICO_CONSISTENTE
 
 
 def test_executar_forca_reprocessamento_com_senha_correta(tmp_path, monkeypatch):
     bases_dir, manual_path = _preparar_bases(tmp_path)
     index_path = _preparar_index(tmp_path)
-    (tmp_path / "historico_mb51.json").write_text(json.dumps({"2026-08-10": {"linhas_atendidas_d009": 0}}), encoding="utf-8")
+    (tmp_path / "historico_mb51.json").write_text(json.dumps(_HISTORICO_CONSISTENTE), encoding="utf-8")
 
     # senha de teste — nunca a senha real de produção (esse arquivo vai pro GitHub).
     senha_teste = "senha-de-teste-123"
@@ -236,7 +287,7 @@ def test_executar_forca_reprocessamento_com_senha_correta(tmp_path, monkeypatch)
     assert codigo == 0
     historico = json.loads((tmp_path / "historico_mb51.json").read_text(encoding="utf-8"))
     assert historico["2026-08-10"]["intercompany"] == 2
-    assert historico["2026-08-10"] != {"linhas_atendidas_d009": 0}
+    assert historico["2026-08-10"] != _HISTORICO_CONSISTENTE["2026-08-10"]
 
 
 # ---- sincronização automática com o GitHub, no início de executar() -------

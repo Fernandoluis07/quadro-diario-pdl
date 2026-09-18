@@ -5,3 +5,7 @@ __pycache__/
 # Extrações SAP + planilha manual do dia — dado bruto sensível, nunca vai pro git
 # (só os indicadores JÁ CALCULADOS pelo Cabeçalho são publicados).
 /Bases/
+
+# Gerados pelo verificador de saúde (backend/saude.py) — estado local, nunca vão pro git.
+alertas_saude.js
+.saude_estado.json

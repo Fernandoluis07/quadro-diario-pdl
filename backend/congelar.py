@@ -180,6 +180,37 @@ def atualizar_constante_historico_js(html: str, nome_const: str, historico: dict
     return novo_html
 
 
+def remover_dia(repo_root: str, index_path: str, data_iso: str) -> list[str]:
+    """Desfaz o congelamento do ÚLTIMO dia congelado (ex.: dia fechado antes de acabar).
+
+    Tira a data de historico_mb51/manuais/zmm028/paineis.json E das constantes
+    HISTORICO_* do index.html, a partir do mesmo dict (as duas cópias nunca divergem —
+    ver docstring do módulo). Só aceita o último dia: remover um dia do meio deixaria um
+    buraco no histórico. NÃO mexe no HTML estático do Início nem no historico_mensal (o
+    congelamento anterior já os deixou coerentes se rodou depois; senão, reprocesse o
+    dia anterior). Devolve os arquivos alterados."""
+    caminhos = {nome: os.path.join(repo_root, f"historico_{nome}.json") for nome in ("mb51", "manuais", "zmm028", "paineis")}
+    historicos = {nome: _carregar_json(c) for nome, c in caminhos.items()}
+    if data_iso not in historicos["mb51"]:
+        raise ValueError(f"O dia {data_iso} não está congelado — nada a remover.")
+    ultimo = max(historicos["mb51"])
+    if data_iso != ultimo:
+        raise ValueError(f"Só o último dia congelado ({ultimo}) pode ser removido, não {data_iso}.")
+
+    with open(index_path, "r", encoding="utf-8") as f:
+        html = f.read()
+    constantes = {"mb51": "HISTORICO_MB51", "manuais": "HISTORICO_MANUAL", "zmm028": "HISTORICO_ZMM028", "paineis": "HISTORICO_PAINEIS"}
+    for nome, h in historicos.items():
+        h.pop(data_iso, None)
+        html = atualizar_constante_historico_js(html, constantes[nome], h)
+
+    for nome, c in caminhos.items():
+        _salvar_json(c, historicos[nome])
+    with open(index_path, "w", encoding="utf-8") as f:
+        f.write(html)
+    return [os.path.basename(c) for c in caminhos.values()] + [os.path.basename(index_path)]
+
+
 # ---- Painéis estáticos da tela Início -----------------------------------------
 
 def _dividir_secao_inicio(html: str) -> tuple[str, str, str]:
