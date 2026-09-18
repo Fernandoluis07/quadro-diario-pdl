@@ -367,12 +367,37 @@ def notificar_janela(alertas: list[dict], repo_root: str, agora: datetime.dateti
     return True
 
 
+def criticos_pendentes(repo_root: str = REPO_ROOT, bases_dir: str | None = None, mb51=None, agora: datetime.datetime | None = None) -> list[dict]:
+    """Alertas CRÍTICOS não resolvidos dos 4 tipos (sequência, extração, dia em aberto/fechado
+    incompleto, código sem commit). Usado como portão do push: qualquer um cancela o envio."""
+    return [a for a in verificar(repo_root=repo_root, bases_dir=bases_dir, agora=agora, mb51=mb51) if a["nivel"] == "critico"]
+
+
+def portao_de_push(repo_root: str = REPO_ROOT, bases_dir: str | None = None, mb51=None) -> int:
+    """0 = pode subir; 1 = PUSH CANCELADO (sem perguntar). Se o próprio verificador falhar,
+    também cancela (falha fechada) — portão que falha aberto é silêncio disfarçado."""
+    try:
+        criticos = criticos_pendentes(repo_root, bases_dir, mb51)
+    except Exception as e:  # noqa: BLE001
+        imprimir(f"PUSH CANCELADO: não consegui verificar a saúde do sistema ({type(e).__name__}: {e}).")
+        return 1
+    if criticos:
+        imprimir(formatar_banner(criticos))
+        imprimir(f"PUSH CANCELADO: {len(criticos)} alerta(s) crítico(s) pendente(s). Resolva-os e tente de novo.")
+        return 1
+    imprimir("Portão de push: nenhum alerta crítico — liberado.")
+    return 0
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--rapido", action="store_true", help="não lê a MB51 (calendário de dias úteis no lugar)")
     p.add_argument("--notificar", action="store_true", help="grava alertas_saude.js e abre janela se houver crítico")
     p.add_argument("--bases-dir", default=None)
+    p.add_argument("--gate", action="store_true", help="portão de push: sai com 1 (cancela) se houver alerta crítico")
     args = p.parse_args()
+    if args.gate:
+        raise SystemExit(portao_de_push(bases_dir=args.bases_dir))
     agora = datetime.datetime.now()
     alertas = verificar(bases_dir=args.bases_dir, agora=agora, ler_mb51=not args.rapido)
     imprimir(formatar_banner(alertas))

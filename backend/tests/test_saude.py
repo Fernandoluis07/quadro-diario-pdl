@@ -195,3 +195,54 @@ def test_notificar_so_abre_janela_para_critico_e_nao_repete_o_mesmo_alerta(tmp_p
     novo = crit + [saude._alerta("z", "critico", "novo")]
     assert saude.notificar_janela(novo, str(tmp_path), agora + datetime.timedelta(hours=8)) is True     # alerta novo
     assert len(abertas) == 3
+
+
+# ---- portão de push -------------------------------------------------------------------
+
+def _fake_verificar(alertas):
+    return lambda **_kw: alertas
+
+
+def test_portao_libera_quando_so_ha_aviso_e_info(monkeypatch, capsys):
+    monkeypatch.setattr(saude, "verificar", _fake_verificar([saude._alerta("a", "aviso", "x"), saude._alerta("b", "info", "y")]))
+    assert saude.portao_de_push() == 0
+    assert "liberado" in capsys.readouterr().out
+
+
+def test_portao_cancela_com_qualquer_alerta_critico(monkeypatch, capsys):
+    monkeypatch.setattr(saude, "verificar", _fake_verificar([saude._alerta("dia_pulado", "critico", "31/08 pulado")]))
+    assert saude.portao_de_push() == 1
+    saida = capsys.readouterr().out
+    assert "PUSH CANCELADO" in saida and "31/08 pulado" in saida
+
+
+def test_portao_falha_fechado_se_o_verificador_quebrar(monkeypatch, capsys):
+    def quebra(**_kw):
+        raise RuntimeError("rede caiu")
+    monkeypatch.setattr(saude, "verificar", quebra)
+    assert saude.portao_de_push() == 1
+    assert "PUSH CANCELADO" in capsys.readouterr().out
+
+
+def test_hook_pre_push_versionado_cancela_o_push_de_verdade(tmp_path):
+    """Push real (git) contra um remoto temporário: com o hook do repositório e um portão
+    que retorna 1, o push é recusado e o remoto continua vazio."""
+    hook = os.path.join(os.path.dirname(saude.__file__), "..", "hooks", "pre-push")
+    assert open(hook, encoding="utf-8").read().rstrip().endswith("python -m backend.saude --gate")
+    bare = tmp_path / "r.git"
+    bare.mkdir()
+    _git(bare, "init", "--bare", "-b", "main")
+    w = tmp_path / "w"
+    (w / "hooks").mkdir(parents=True)
+    _git(w, "init", "-b", "main")
+    _git(w, "config", "user.email", "t@t")
+    _git(w, "config", "user.name", "t")
+    (w / "hooks" / "pre-push").write_text("#!/bin/sh\necho PORTAO; exit 1\n", newline="\n")
+    _git(w, "config", "core.hooksPath", "hooks")
+    (w / "a.txt").write_text("a")
+    _git(w, "add", "a.txt")
+    _git(w, "commit", "-m", "c")
+    _git(w, "remote", "add", "origin", str(bare))
+    r = subprocess.run(["git", "push", "origin", "main"], cwd=w, capture_output=True, text=True)
+    assert r.returncode != 0 and "PORTAO" in (r.stdout + r.stderr)
+    assert subprocess.run(["git", "branch", "--list"], cwd=bare, capture_output=True, text=True).stdout.strip() == ""

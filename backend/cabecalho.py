@@ -355,6 +355,12 @@ def executar(
         print("Ok — as alterações ficaram salvas localmente. Suba manualmente quando quiser (git add/commit/push).")
         return 0
 
+    # Portão de push: alerta crítico pendente CANCELA o envio, sem perguntar (nada foi
+    # commitado ainda; os arquivos congelados ficam salvos localmente).
+    if saude.portao_de_push(REPO_ROOT, bases_dir, df_mb51) != 0:
+        print("As alterações ficaram salvas localmente. Resolva os alertas e rode o Cabeçalho de novo pra subir.")
+        return 1
+
     arquivos_congelados = resultado["arquivos_json_atualizados"] + [resultado["index_html_atualizado"]]
     try:
         subir_para_github(REPO_ROOT, hoje.isoformat(), arquivos_congelados)

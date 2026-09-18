@@ -158,6 +158,34 @@ def test_executar_continua_quando_usuario_digita_continuar_no_bloqueio(tmp_path,
     assert "2026-08-10" in json.loads((tmp_path / "historico_mb51.json").read_text(encoding="utf-8"))
 
 
+def _executar_ate_o_push(tmp_path, monkeypatch, alertas):
+    bases_dir, manual_path = _preparar_bases(tmp_path)
+    index_path = _preparar_index(tmp_path)
+    (tmp_path / "historico_mb51.json").write_text(json.dumps(_HISTORICO_CONSISTENTE_ANTERIOR), encoding="utf-8")
+    monkeypatch.setattr(cabecalho.saude, "verificar", lambda **_kw: alertas)
+    subidas = []
+    monkeypatch.setattr(cabecalho, "subir_para_github", lambda *a, **k: subidas.append(a))
+    respostas = iter(["s", "s"])  # "Posso congelar?", "Posso subir pro GitHub?"
+    monkeypatch.setattr("builtins.input", lambda _: next(respostas))
+    codigo = cabecalho.executar(bases_dir=bases_dir, manual_path=manual_path, index_path=index_path)
+    return codigo, subidas
+
+
+_HISTORICO_CONSISTENTE_ANTERIOR = {"2026-08-09": {"linhas_atendidas_d009": 0, "intercompany": 0}}
+
+
+def test_push_e_cancelado_sem_perguntar_com_alerta_critico(tmp_path, monkeypatch, capsys):
+    codigo, subidas = _executar_ate_o_push(tmp_path, monkeypatch, [{"codigo": "x", "nivel": "critico", "titulo": "CRIT", "detalhe": ""}])
+    assert codigo == 1 and subidas == []
+    assert "PUSH CANCELADO" in capsys.readouterr().out
+    assert "2026-08-10" in json.loads((tmp_path / "historico_mb51.json").read_text(encoding="utf-8"))  # congelou local
+
+
+def test_push_segue_normalmente_sem_alerta_critico(tmp_path, monkeypatch):
+    codigo, subidas = _executar_ate_o_push(tmp_path, monkeypatch, [{"codigo": "x", "nivel": "aviso", "titulo": "so aviso", "detalhe": ""}])
+    assert codigo == 0 and len(subidas) == 1
+
+
 def test_checar_arquivos_lista_o_que_falta(tmp_path):
     faltando = cabecalho._checar_arquivos(str(tmp_path), str(tmp_path / "manual.xlsx"))
     assert len(faltando) == 7  # mb51, mb25, ZMM028, MM60, saldo âncora D009, saldo âncora D016, planilha manual
