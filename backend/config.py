@@ -35,6 +35,19 @@ ZMM028_FILENAME = "ZMM028.xlsx"
 MM60_FILENAME = "MM60.xlsx"
 MM60_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Bases")
 
+# Saldo "âncora" de cada material em 01/04/2026 — ponto de partida da reconstrução dia a
+# dia do indicador 6 (Avaliação de MRP, tela Gestão de Estoque). Mesma pasta/cadência da
+# MM60 acima (referência fixa, atualizada esporadicamente, não faz parte das 3 planilhas
+# trocadas todo dia). DOIS arquivos, não um só combinado — decisão explícita de Fernando
+# 2026-08-25: rastreabilidade (se um número parecer errado, dá pra saber de qual depósito
+# veio) pesa mais que a conveniência de já vir somado, e o código já soma os dois de
+# qualquer jeito (ver indicadores._saldo_ancora_combinado). O arquivo D009 tem
+# Classificação MRP (é a fonte do universo VB do indicador); o D016 não tem essa coluna —
+# só complementa saldo de quem já é VB pelo arquivo D009 (confirmado: os poucos materiais
+# exclusivos do D016 são todos ND, comprados direto lá, nunca passam pela ZMM028/D009).
+SALDO_ANCORA_D009_FILENAME = "saldo_material_01_04_2026.xlsx"
+SALDO_ANCORA_D016_FILENAME = "saldo_material_d016_01_04_2026.xlsx"
+
 # Hash SHA-256 (nunca a senha em texto puro — este arquivo vai pro GitHub) da senha
 # que libera o reprocessamento forçado de um dia já congelado (ver backend/cabecalho.py).
 SENHA_FORCAR_RECONGELAMENTO_SHA256 = "3d14c2d4e4ced81e459e4ace7c01466a700000fb94a3bbe944a55fb92693e879"
@@ -56,9 +69,22 @@ BWART_INTERCOMPANY = {"601", "833"}
 # Nunca Movimentados) e reutilizável por qualquer outro indicador que precise da mesma
 # pergunta no futuro. Superset de BWART_ATENDIMENTO: 702 e Z30 são baixa real também,
 # não são exceção (confirmados na MB51 real: 48 linhas de 702, 410 de Z30). NÃO conta
-# BWART_ESTORNO (são estornos/reversão de uma baixa anterior, não uma baixa em si).
+# BWART_ESTORNO (são estornos/reversão de uma baixa anterior, não uma baixa em si) nem
+# devolução.
 # IMPORTANTE: pertencer a este conjunto não basta — uma linha só conta como baixa real
-# se a quantidade também for maior que zero (ver indicadores._materiais_com_baixa_real).
-# Baixa com quantidade 0 é ajuste administrativo (fechar/cancelar reserva ou ordem
-# errada), não saída física.
+# se a quantidade também for DIFERENTE de zero (ver indicadores._materiais_com_baixa_real
+# — checa "!= 0", não só "< 0": baixa nessa planilha costuma vir negativa na prática,
+# mas a regra de negócio não depende dessa suposição de sinal). Quantidade 0 é ajuste
+# administrativo (fechar/cancelar reserva ou ordem errada), não saída física.
+# Validado manualmente por Fernando contra a MB51 real, código por código: 2.637
+# materiais VB com saldo - baixa real (qualquer depósito) = 495 nunca movimentados.
 BWART_BAIXA_REAL = BWART_ATENDIMENTO | {"702", "Z30"}
+
+# "Entrada" ampla — pra achar a Data de Entrada do indicador 4 (Materiais Nunca
+# Movimentados), não basta nota fiscal normal (BWART_RECEBIMENTO): material também
+# pode ter entrado no estoque por ajuste de inventário ou outro tipo "não-nota",
+# legado ou atual (o saldo positivo na ZMM028 já prova que ENTROU de algum jeito —
+# só não sabíamos identificar QUANDO se só olhássemos 101/835). NÃO substitui
+# BWART_RECEBIMENTO, que continua sendo só nota fiscal (indicadores "Recebimentos
+# D009/D016") — esse conjunto é usado só pra Data de Entrada.
+BWART_ENTRADA_AMPLA = BWART_RECEBIMENTO | {"918", "Z15", "Z29", "701", "920"}

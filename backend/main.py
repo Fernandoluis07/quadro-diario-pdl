@@ -96,6 +96,14 @@ def calcular_todos_indicadores(
     # Almoxarifado) — mora fixo dentro do repo (config.MM60_DIR), independente de
     # `bases_dir`/--bases-dir, que só vale pras 3 planilhas trocadas todo dia.
     mm60 = extratos.carregar_mm60(os.path.join(config.MM60_DIR, config.MM60_FILENAME))
+    # Saldos-âncora do indicador 6 (Avaliação de MRP) — mesma pasta fixa da MM60, dois
+    # arquivos por decisão de rastreabilidade (ver config.SALDO_ANCORA_D009/D016_FILENAME).
+    saldo_ancora_d009 = extratos.carregar_saldo_ancora_d009(
+        os.path.join(config.MM60_DIR, config.SALDO_ANCORA_D009_FILENAME)
+    )
+    saldo_ancora_d016 = extratos.carregar_saldo_ancora_d016(
+        os.path.join(config.MM60_DIR, config.SALDO_ANCORA_D016_FILENAME)
+    )
 
     hoje, ontem = _detectar_hoje_ontem(mb51, data_ref)
 
@@ -107,6 +115,7 @@ def calcular_todos_indicadores(
     nunca_movimentados = indicadores.materiais_nunca_movimentados(
         zmm028, mb51, mm60, valor_total_vb, qtd_total_vb, hoje
     )
+    avaliacao_mrp = indicadores.avaliacao_mrp(zmm028, mb51, saldo_ancora_d009, saldo_ancora_d016)
 
     resultado = {
         "data_referencia": hoje.isoformat(),
@@ -134,6 +143,7 @@ def calcular_todos_indicadores(
         "materiais_nunca_movimentados_pct_distribuicao": nunca_movimentados["pct_distribuicao"],
         "materiais_nunca_movimentados_itens": nunca_movimentados["itens"],
         "classificacao_mrp": indicadores.classificacao_mrp(zmm028_todos_depositos),
+        "avaliacao_mrp": avaliacao_mrp,
         "materiais_vb_sem_preco_mm60": indicadores.materiais_vb_sem_preco_mm60(zmm028, mm60),
         "ontem": _calcular_bloco1(mb51, ontem) if ontem else None,
     }

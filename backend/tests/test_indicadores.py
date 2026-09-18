@@ -350,9 +350,12 @@ def test_materiais_acima_estoque_maximo_itens_colunas_e_sinal_positivo():
 # ---- Indicador 4 — Materiais Nunca Movimentados -----------------------------
 
 def _mb51_mov(rows):
+    # -1 por padrão: baixa real nessa planilha vem SEMPRE com quantidade negativa
+    # (confirmado contra a MB51 real — ver indicadores._materiais_com_baixa_real).
+    # Testes de entrada (BWART 101) não olham o sinal, então o default serve pros dois.
     base = {
         "Material": "", "_deposito_norm": "D009", "_bwart_norm": "", "_data_norm": HOJE,
-        "Qtd.  UM registro": 1,
+        "Qtd.  UM registro": -1,
     }
     if not rows:
         # pd.DataFrame([]) não tem colunas nenhuma — mantém o schema mesmo vazio,
@@ -445,16 +448,43 @@ def test_materiais_nunca_movimentados_entrada_sozinha_nao_exclui():
     assert resultado["itens"][0]["data_entrada"] == "2023-01-10"
 
 
-def test_materiais_nunca_movimentados_ignora_saida_fora_do_deposito_d009():
-    """Saída registrada em D016 não conta pra excluir o material do recorte D009
-    (indicador 4 é D009, mesmo escopo dos indicadores 1/2)."""
+def test_materiais_nunca_movimentados_saida_em_d016_tambem_conta():
+    """Regra de exclusão NÃO filtra por depósito — "já teve baixa em qualquer
+    depósito" (D009 ou D016), não só no D009 específico (validado manualmente por
+    Fernando contra a MB51 real). Só o universo de candidatos (ZMM028) é D009;
+    a checagem de baixa na MB51 olha os dois juntos."""
     zmm028 = _zmm028_gestao([{"Material": "1", "Util.livre": 10}])
     mb51 = _mb51_mov([{"Material": "1", "_bwart_norm": "201", "_deposito_norm": "D016"}])
     mm60 = _mm60([("1", 1.0)])
     resultado = indicadores.materiais_nunca_movimentados(
         zmm028, mb51, mm60, valor_total_vb=100.0, total_materiais_vb=1, hoje=HOJE
     )
-    assert resultado["qtd"] == 1
+    assert resultado["qtd"] == 0
+
+
+def test_materiais_nunca_movimentados_baixa_com_quantidade_positiva_tambem_conta():
+    """A regra é quantidade DIFERENTE de zero, não "menor que zero" — não depende
+    de baixa vir sempre negativa (mesmo sendo o padrão observado na prática)."""
+    zmm028 = _zmm028_gestao([{"Material": "1", "Util.livre": 10}])
+    mb51 = _mb51_mov([{"Material": "1", "_bwart_norm": "201", "Qtd.  UM registro": 5}])
+    mm60 = _mm60([("1", 1.0)])
+    resultado = indicadores.materiais_nunca_movimentados(
+        zmm028, mb51, mm60, valor_total_vb=100.0, total_materiais_vb=1, hoje=HOJE
+    )
+    assert resultado["qtd"] == 0
+
+
+def test_materiais_nunca_movimentados_entrada_ampla_cobre_ajuste_de_inventario():
+    """Data de Entrada não é só nota fiscal (101/835) — também conta ajuste de
+    inventário/entrada não-nota, legada e atual (918/Z15/Z29/701/920)."""
+    for bwart in ("918", "Z15", "Z29", "701", "920"):
+        zmm028 = _zmm028_gestao([{"Material": "1", "Util.livre": 10}])
+        mb51 = _mb51_mov([{"Material": "1", "_bwart_norm": bwart, "_data_norm": datetime.date(2023, 1, 10)}])
+        mm60 = _mm60([("1", 1.0)])
+        resultado = indicadores.materiais_nunca_movimentados(
+            zmm028, mb51, mm60, valor_total_vb=100.0, total_materiais_vb=1, hoje=HOJE
+        )
+        assert resultado["itens"][0]["data_entrada"] == "2023-01-10", f"falhou pro BWART {bwart}"
 
 
 def test_materiais_nunca_movimentados_sem_entrada_conhecida_data_e_tempo_ficam_none():
@@ -547,3 +577,308 @@ def test_resumo_vb_conta_e_soma_so_classificacao_vb():
     qtd, valor = indicadores.resumo_vb(df)
     assert qtd == 2
     assert valor == 300.0
+
+
+# ---- Indicador 6 — Avaliação de MRP -----------------------------------------
+# Especificação final validada com Fernando 2026-08-24/25 (ver docstring de
+# indicadores.avaliacao_mrp) — saldo combinado D009+D016, âncora em 2 arquivos somados
+# por material, consumo só com BWART_BAIXA_REAL, sem filtro/dedup de movimento nenhum.
+
+def _saldo_ancora_d009(rows):
+    base = {"Material": "", "Classificacao MRP": "VB", "Saldo em 01/04/2026": 0}
+    return pd.DataFrame([{**base, **r} for r in rows])
+
+
+def _saldo_ancora_d016(rows):
+    if not rows:
+        return pd.DataFrame(columns=["Material", "Saldo em 01/04/2026 (D016)"])
+    base = {"Material": "", "Saldo em 01/04/2026 (D016)": 0}
+    return pd.DataFrame([{**base, **r} for r in rows])
+
+
+def test_saldo_ancora_combinado_filtra_vb_e_soma_d009_com_d016():
+    d009 = _saldo_ancora_d009(
+        [
+            {"Material": "1", "Classificacao MRP": "VB", "Saldo em 01/04/2026": 10},
+            {"Material": "2", "Classificacao MRP": "ND", "Saldo em 01/04/2026": 999},  # fora, não é VB
+        ]
+    )
+    d016 = _saldo_ancora_d016([{"Material": "1", "Saldo em 01/04/2026 (D016)": 5}])
+    resultado = indicadores._saldo_ancora_combinado(d009, d016)
+    assert len(resultado) == 1
+    linha = resultado.iloc[0]
+    assert linha["_material_norm"] == "1"
+    assert linha["_saldo_ancora"] == 15.0
+
+
+def test_saldo_ancora_combinado_material_sem_linha_no_d016_entra_com_zero():
+    d009 = _saldo_ancora_d009([{"Material": "1", "Saldo em 01/04/2026": 7}])
+    d016 = _saldo_ancora_d016([])
+    resultado = indicadores._saldo_ancora_combinado(d009, d016)
+    assert resultado.iloc[0]["_saldo_ancora"] == 7.0
+
+
+def test_reconstruir_saldo_material_conta_zeragem_positivo_pra_zero_ou_negativo():
+    movimentos = pd.DataFrame(
+        [
+            {"data": datetime.date(2026, 4, 5), "bwart": "201", "quantidade": -5.0},  # 10 -> 5
+            {"data": datetime.date(2026, 4, 6), "bwart": "201", "quantidade": -5.0},  # 5 -> 0 (zeragem)
+            {"data": datetime.date(2026, 4, 10), "bwart": "101", "quantidade": 8.0},  # 0 -> 8
+            {"data": datetime.date(2026, 4, 12), "bwart": "201", "quantidade": -10.0},  # 8 -> -2 (zeragem)
+        ]
+    )
+    resultado = indicadores._reconstruir_saldo_material(movimentos, saldo_inicial=10.0)
+    assert resultado["zeragens"] == 2
+    assert resultado["ultimo_dia_zerou"] == datetime.date(2026, 4, 12)
+    assert resultado["ultimo_dia_mov"] == datetime.date(2026, 4, 12)
+    assert resultado["datas_zeragem"] == [datetime.date(2026, 4, 6), datetime.date(2026, 4, 12)]
+
+
+def test_reconstruir_saldo_material_transferencia_resolvida_no_mesmo_instante_nao_zera():
+    """Duas pontas de uma transferência entre depósitos somam 0 na soma combinada —
+    partindo de um saldo já positivo (ver 805280, validado por Fernando 2026-08-25:
+    âncora combinada 20, sobe pra 40 e volta pra 20), o saldo nunca cai abaixo/igual a
+    zero vindo de positivo, então não conta zeragem. (Partir de saldo 0 é um caso
+    diferente — aí sim cruza de positivo pra zero de verdade, ver teste abaixo.)"""
+    movimentos = pd.DataFrame(
+        [
+            {"data": datetime.date(2026, 4, 8), "bwart": "311", "quantidade": 20.0},
+            {"data": datetime.date(2026, 4, 8), "bwart": "311", "quantidade": -20.0},
+        ]
+    )
+    resultado = indicadores._reconstruir_saldo_material(movimentos, saldo_inicial=20.0)
+    assert resultado["zeragens"] == 0
+
+
+def test_reconstruir_saldo_material_transferencia_partindo_de_zero_conta_zeragem():
+    """Diferente do teste acima: partindo de saldo_inicial 0, subir e voltar pra 0
+    cruza de positivo (20) pra zero de verdade — é uma zeragem real, não um artefato
+    da transferência (a soma ainda fecha em 0, mas passou por >0 no meio)."""
+    movimentos = pd.DataFrame(
+        [
+            {"data": datetime.date(2026, 4, 8), "bwart": "311", "quantidade": 20.0},
+            {"data": datetime.date(2026, 4, 8), "bwart": "311", "quantidade": -20.0},
+        ]
+    )
+    resultado = indicadores._reconstruir_saldo_material(movimentos, saldo_inicial=0.0)
+    assert resultado["zeragens"] == 1
+
+
+def test_reconstruir_saldo_material_soma_saidas_reais_ignora_bwart_fora_de_baixa_real():
+    """soma_saidas_reais só conta negativo com BWART em config.BWART_BAIXA_REAL
+    (atendimento + 702 + Z30) — um estorno negativo (BWART_ESTORNO) não entra."""
+    movimentos = pd.DataFrame(
+        [
+            {"data": datetime.date(2026, 4, 5), "bwart": "201", "quantidade": -5.0},  # baixa real, conta
+            {"data": datetime.date(2026, 4, 6), "bwart": "202", "quantidade": -3.0},  # estorno, NÃO conta
+            {"data": datetime.date(2026, 4, 7), "bwart": "702", "quantidade": -2.0},  # baixa real (702), conta
+        ]
+    )
+    resultado = indicadores._reconstruir_saldo_material(movimentos, saldo_inicial=100.0)
+    assert resultado["soma_saidas_reais"] == -7.0
+
+
+def test_reconstruir_saldo_material_movimento_zero_nao_gera_zeragem_extra():
+    movimentos = pd.DataFrame(
+        [
+            {"data": datetime.date(2026, 4, 5), "bwart": "201", "quantidade": -5.0},  # 5 -> 0 (zeragem)
+            {"data": datetime.date(2026, 4, 6), "bwart": "201", "quantidade": 0.0},  # continua em 0
+        ]
+    )
+    resultado = indicadores._reconstruir_saldo_material(movimentos, saldo_inicial=5.0)
+    assert resultado["zeragens"] == 1
+
+
+def test_tempo_medio_reposicao_media_dos_intervalos():
+    datas_zeragem = [datetime.date(2026, 4, 10), datetime.date(2026, 5, 1)]
+    datas_entrada = [datetime.date(2026, 4, 15), datetime.date(2026, 5, 6)]  # 5 dias, 5 dias
+    assert indicadores._tempo_medio_reposicao(datas_zeragem, datas_entrada) == 5.0
+
+
+def test_tempo_medio_reposicao_ignora_zeragem_sem_entrada_seguinte():
+    """2ª zeragem não tem nenhuma entrada depois dela — só a 1ª entra na média."""
+    datas_zeragem = [datetime.date(2026, 4, 10), datetime.date(2026, 8, 1)]
+    datas_entrada = [datetime.date(2026, 4, 15)]
+    assert indicadores._tempo_medio_reposicao(datas_zeragem, datas_entrada) == 5.0
+
+
+def test_tempo_medio_reposicao_sem_nenhuma_entrada_retorna_none():
+    assert indicadores._tempo_medio_reposicao([datetime.date(2026, 4, 10)], []) is None
+    assert indicadores._tempo_medio_reposicao([datetime.date(2026, 4, 10)], None) is None
+
+
+def test_classificar_criticidade_consumo_maior_que_maximo_e_critico_capado_em_100():
+    nivel, criticidade = indicadores._classificar_criticidade(consumo_medio_mensal=50.0, estoque_maximo=40.0)
+    assert nivel == "critico"
+    assert criticidade == 100  # proporção real é 125%, mas a barra capa em 100
+
+
+def test_classificar_criticidade_cortes_alto_e_medio():
+    nivel_alto, pct_alto = indicadores._classificar_criticidade(consumo_medio_mensal=7.0, estoque_maximo=10.0)
+    assert (nivel_alto, pct_alto) == ("alto", 70)
+
+    nivel_medio, pct_medio = indicadores._classificar_criticidade(consumo_medio_mensal=6.9, estoque_maximo=10.0)
+    assert (nivel_medio, pct_medio) == ("medio", 69)
+
+
+def test_classificar_criticidade_maximo_zero_com_consumo_positivo_e_critico():
+    """Estoque Máximo não cadastrado (0) e consumo real positivo -> crítico, mesma
+    regra matemática (consumo > máximo), sem tratamento especial pro caso 0."""
+    nivel, criticidade = indicadores._classificar_criticidade(consumo_medio_mensal=5.0, estoque_maximo=0.0)
+    assert nivel == "critico"
+    assert criticidade == 100
+
+
+def test_classificar_criticidade_maximo_e_consumo_zero_e_medio_sem_dividir_por_zero():
+    nivel, criticidade = indicadores._classificar_criticidade(consumo_medio_mensal=0.0, estoque_maximo=0.0)
+    assert (nivel, criticidade) == ("medio", 0)
+
+
+def test_avaliacao_mrp_material_que_zera_entra_com_todos_os_campos():
+    d009 = _saldo_ancora_d009([{"Material": "1", "Saldo em 01/04/2026": 5}])
+    d016 = _saldo_ancora_d016([])
+    zmm028 = _zmm028_gestao([{"Material": "1", "Denom.": "Parafuso", "Pt.reabast": 3, "Estq.máx.": 20}])
+    mb51 = _mb51_mov(
+        [
+            {"Material": "1", "_bwart_norm": "201", "_data_norm": datetime.date(2026, 4, 10), "Qtd.  UM registro": -5},  # 5 -> 0, zeragem
+            {"Material": "1", "_bwart_norm": "101", "_data_norm": datetime.date(2026, 4, 15), "Qtd.  UM registro": 10},  # entrada, repõe
+        ]
+    )
+    resultado = indicadores.avaliacao_mrp(zmm028, mb51, d009, d016)
+    assert resultado["qtd"] == 1
+    item = resultado["itens"][0]
+    assert item["material"] == "1"
+    assert item["descricao"] == "Parafuso"
+    assert item["classe"] == "VB"
+    assert item["vezesZerou"] == 1
+    assert item["ultimoZerou"] == "10/04/2026"
+    assert item["tempoReposicao"] == 5.0  # 15/04 - 10/04
+    assert item["min"] == 3.0
+    assert item["max"] == 20.0
+
+
+def test_avaliacao_mrp_quem_nunca_zera_fica_de_fora_mesmo_com_movimento():
+    d009 = _saldo_ancora_d009([{"Material": "1", "Saldo em 01/04/2026": 100}])
+    d016 = _saldo_ancora_d016([])
+    zmm028 = _zmm028_gestao([{"Material": "1", "Pt.reabast": 3, "Estq.máx.": 20}])
+    mb51 = _mb51_mov([{"Material": "1", "_bwart_norm": "201", "_data_norm": datetime.date(2026, 4, 10), "Qtd.  UM registro": -5}])
+    resultado = indicadores.avaliacao_mrp(zmm028, mb51, d009, d016)
+    assert resultado["qtd"] == 0
+
+
+def test_avaliacao_mrp_ignora_classificacao_diferente_de_vb():
+    d009 = _saldo_ancora_d009([{"Material": "1", "Classificacao MRP": "ND", "Saldo em 01/04/2026": 5}])
+    d016 = _saldo_ancora_d016([])
+    zmm028 = _zmm028_gestao([{"Material": "1", "Pt.reabast": 3, "Estq.máx.": 20}])
+    mb51 = _mb51_mov([{"Material": "1", "_bwart_norm": "201", "_data_norm": datetime.date(2026, 4, 10), "Qtd.  UM registro": -5}])
+    resultado = indicadores.avaliacao_mrp(zmm028, mb51, d009, d016)
+    assert resultado["qtd"] == 0
+
+
+def test_avaliacao_mrp_material_sem_zmm028_hoje_fica_de_fora():
+    """VB no arquivo-âncora mas não existe mais na ZMM028 de hoje -> sem Estoque
+    Mínimo/Máximo pra cruzar, não entra (decisão explícita, ver docstring)."""
+    d009 = _saldo_ancora_d009([{"Material": "1", "Saldo em 01/04/2026": 5}])
+    d016 = _saldo_ancora_d016([])
+    zmm028 = _zmm028_gestao([{"Material": "999", "Pt.reabast": 3, "Estq.máx.": 20}])
+    mb51 = _mb51_mov([{"Material": "1", "_bwart_norm": "201", "_data_norm": datetime.date(2026, 4, 10), "Qtd.  UM registro": -5}])
+    resultado = indicadores.avaliacao_mrp(zmm028, mb51, d009, d016)
+    assert resultado["qtd"] == 0
+
+
+def test_avaliacao_mrp_movimento_anterior_a_01_04_e_ignorado():
+    d009 = _saldo_ancora_d009([{"Material": "1", "Saldo em 01/04/2026": 5}])
+    d016 = _saldo_ancora_d016([])
+    zmm028 = _zmm028_gestao([{"Material": "1", "Pt.reabast": 3, "Estq.máx.": 20}])
+    mb51 = _mb51_mov([{"Material": "1", "_bwart_norm": "201", "_data_norm": datetime.date(2026, 3, 31), "Qtd.  UM registro": -5}])
+    resultado = indicadores.avaliacao_mrp(zmm028, mb51, d009, d016)
+    assert resultado["qtd"] == 0
+
+
+def test_avaliacao_mrp_consumo_medio_mensal_soma_saidas_reais_sobre_meses_decorridos():
+    """Saída real de -30 em 01/05 (30 dias corridos após a âncora 01/04) -> consumo
+    mensal = 30 / (30/30) = 30.0. Material também zera pra entrar na lista."""
+    d009 = _saldo_ancora_d009([{"Material": "1", "Saldo em 01/04/2026": 30}])
+    d016 = _saldo_ancora_d016([])
+    zmm028 = _zmm028_gestao([{"Material": "1", "Pt.reabast": 3, "Estq.máx.": 100}])
+    mb51 = _mb51_mov([{"Material": "1", "_bwart_norm": "201", "_data_norm": datetime.date(2026, 5, 1), "Qtd.  UM registro": -30}])
+    resultado = indicadores.avaliacao_mrp(zmm028, mb51, d009, d016)
+    assert resultado["itens"][0]["consumo"] == 30.0
+
+
+def test_avaliacao_mrp_ordena_por_criticidade_nao_por_vezes_zerou():
+    """Material A zera 5x mas é MÉDIO (consumo bem abaixo do máximo); material B zera
+    só 1x mas é CRÍTICO (consumo > máximo); material C zera 3x e é ALTO. A ordem tem
+    que ser B, C, A (crítico > alto > médio) — o oposto da ordem por vezesZerou
+    (A=5x, C=3x, B=1x), pra provar que trocou o critério de verdade (pedido do usuário
+    2026-08-25) e não só coincide num caso particular."""
+    d009 = _saldo_ancora_d009(
+        [
+            {"Material": "A", "Saldo em 01/04/2026": 5},
+            {"Material": "B", "Saldo em 01/04/2026": 5},
+            {"Material": "C", "Saldo em 01/04/2026": 3},
+        ]
+    )
+    d016 = _saldo_ancora_d016([])
+    zmm028 = _zmm028_gestao(
+        [
+            {"Material": "A", "Pt.reabast": 1, "Estq.máx.": 100},
+            {"Material": "B", "Pt.reabast": 1, "Estq.máx.": 10},
+            {"Material": "C", "Pt.reabast": 1, "Estq.máx.": 10},
+        ]
+    )
+    mb51 = _mb51_mov(
+        [
+            # A: zera 5x, saídas somam -17 num mês -> consumo 17, 17/100=17% -> médio
+            {"Material": "A", "_bwart_norm": "201", "_data_norm": datetime.date(2026, 4, 5), "Qtd.  UM registro": -5},
+            {"Material": "A", "_bwart_norm": "101", "_data_norm": datetime.date(2026, 4, 6), "Qtd.  UM registro": 3},
+            {"Material": "A", "_bwart_norm": "201", "_data_norm": datetime.date(2026, 4, 7), "Qtd.  UM registro": -3},
+            {"Material": "A", "_bwart_norm": "101", "_data_norm": datetime.date(2026, 4, 8), "Qtd.  UM registro": 3},
+            {"Material": "A", "_bwart_norm": "201", "_data_norm": datetime.date(2026, 4, 9), "Qtd.  UM registro": -3},
+            {"Material": "A", "_bwart_norm": "101", "_data_norm": datetime.date(2026, 4, 10), "Qtd.  UM registro": 3},
+            {"Material": "A", "_bwart_norm": "201", "_data_norm": datetime.date(2026, 4, 11), "Qtd.  UM registro": -3},
+            {"Material": "A", "_bwart_norm": "101", "_data_norm": datetime.date(2026, 4, 12), "Qtd.  UM registro": 3},
+            {"Material": "A", "_bwart_norm": "201", "_data_norm": datetime.date(2026, 5, 1), "Qtd.  UM registro": -3},
+            # B: zera 1x, saída -20 num mês -> consumo 20, > máximo 10 -> crítico
+            {"Material": "B", "_bwart_norm": "201", "_data_norm": datetime.date(2026, 5, 1), "Qtd.  UM registro": -20},
+            # C: zera 3x, saídas somam -8 num mês -> consumo 8, 8/10=80% -> alto
+            {"Material": "C", "_bwart_norm": "201", "_data_norm": datetime.date(2026, 4, 5), "Qtd.  UM registro": -3},
+            {"Material": "C", "_bwart_norm": "101", "_data_norm": datetime.date(2026, 4, 6), "Qtd.  UM registro": 2},
+            {"Material": "C", "_bwart_norm": "201", "_data_norm": datetime.date(2026, 4, 7), "Qtd.  UM registro": -2},
+            {"Material": "C", "_bwart_norm": "101", "_data_norm": datetime.date(2026, 4, 8), "Qtd.  UM registro": 3},
+            {"Material": "C", "_bwart_norm": "201", "_data_norm": datetime.date(2026, 5, 1), "Qtd.  UM registro": -3},
+        ]
+    )
+    resultado = indicadores.avaliacao_mrp(zmm028, mb51, d009, d016)
+    niveis = {i["material"]: i["nivel"] for i in resultado["itens"]}
+    assert niveis == {"A": "medio", "B": "critico", "C": "alto"}
+    assert [i["material"] for i in resultado["itens"]] == ["B", "C", "A"]
+
+
+def test_avaliacao_mrp_desempate_dentro_do_mesmo_nivel_por_percentual_criticidade_desc():
+    """Dois materiais 'alto' — o de maior % de criticidade vem primeiro."""
+    d009 = _saldo_ancora_d009(
+        [
+            {"Material": "X", "Saldo em 01/04/2026": 3},
+            {"Material": "Y", "Saldo em 01/04/2026": 3},
+        ]
+    )
+    d016 = _saldo_ancora_d016([])
+    zmm028 = _zmm028_gestao(
+        [
+            {"Material": "X", "Pt.reabast": 1, "Estq.máx.": 10},  # consumo 7 -> 70%
+            {"Material": "Y", "Pt.reabast": 1, "Estq.máx.": 10},  # consumo 9 -> 90%
+        ]
+    )
+    mb51 = _mb51_mov(
+        [
+            {"Material": "X", "_bwart_norm": "201", "_data_norm": datetime.date(2026, 4, 5), "Qtd.  UM registro": -3},
+            {"Material": "X", "_bwart_norm": "101", "_data_norm": datetime.date(2026, 4, 6), "Qtd.  UM registro": 4},
+            {"Material": "X", "_bwart_norm": "201", "_data_norm": datetime.date(2026, 5, 1), "Qtd.  UM registro": -4},
+            {"Material": "Y", "_bwart_norm": "201", "_data_norm": datetime.date(2026, 4, 5), "Qtd.  UM registro": -3},
+            {"Material": "Y", "_bwart_norm": "101", "_data_norm": datetime.date(2026, 4, 6), "Qtd.  UM registro": 6},
+            {"Material": "Y", "_bwart_norm": "201", "_data_norm": datetime.date(2026, 5, 1), "Qtd.  UM registro": -6},
+        ]
+    )
+    resultado = indicadores.avaliacao_mrp(zmm028, mb51, d009, d016)
+    assert [i["material"] for i in resultado["itens"]] == ["Y", "X"]

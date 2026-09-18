@@ -81,9 +81,12 @@ def _checar_arquivos(bases_dir: str, manual_path: str) -> list[str]:
         ("mb51.xlsx", os.path.join(bases_dir, config.MB51_FILENAME)),
         ("mb25.xlsx", os.path.join(bases_dir, config.MB25_FILENAME)),
         ("ZMM028.xlsx", os.path.join(bases_dir, config.ZMM028_FILENAME)),
-        # MM60 NÃO é trocada todo dia (preço de referência) — fica fixa em
-        # config.MM60_DIR (dentro do próprio repo), não em bases_dir.
+        # MM60 e os 2 saldos-âncora do indicador 6 NÃO são trocados todo dia
+        # (referência fixa) — ficam fixos em config.MM60_DIR (dentro do próprio
+        # repo), não em bases_dir.
         ("MM60.xlsx", os.path.join(config.MM60_DIR, config.MM60_FILENAME)),
+        ("saldo âncora D009", os.path.join(config.MM60_DIR, config.SALDO_ANCORA_D009_FILENAME)),
+        ("saldo âncora D016", os.path.join(config.MM60_DIR, config.SALDO_ANCORA_D016_FILENAME)),
         ("planilha manual", manual_path),
     ]
     faltando = [f"{nome} (esperado em {caminho})" for nome, caminho in esperados if not os.path.exists(caminho)]

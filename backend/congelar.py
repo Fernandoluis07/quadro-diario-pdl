@@ -339,6 +339,13 @@ def congelar_dia(
         html_novo, "CLASSIFICACAO_MRP", indicadores["classificacao_mrp"]
     )
 
+    # Avaliação de MRP (indicador 6, Gestão de Estoque): mesma "fotografia atual" —
+    # a reconstrução de saldo (backend/indicadores.avaliacao_mrp) já olha a MB51
+    # inteira desde 01/04/2026 a cada congelamento, não faz sentido acumular por dia.
+    html_novo = atualizar_constante_historico_js(
+        html_novo, "AVALIACAO_MRP", indicadores["avaliacao_mrp"]
+    )
+
     # Listas detalhadas dos indicadores 1/2/4 (Gestão de Estoque) — usadas só pra
     # exportação (planilha com a lista completa de materiais), mesma lógica de
     # "fotografia atual" do CHECKLIST_RESERVAS/CLASSIFICACAO_MRP: não entram no

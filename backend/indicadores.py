@@ -280,13 +280,20 @@ def _materiais_com_baixa_real(df_mb51: pd.DataFrame) -> set[str]:
     """Materiais (código normalizado) com pelo menos uma linha de baixa/saída real
     — BWART em config.BWART_BAIXA_REAL (Atendimento + 702 + Z30, sem exceção) E
     quantidade (coluna "Qtd.  UM registro" — dois espaços, é o nome real da MB51)
-    ESTRITAMENTE positiva. Baixa com quantidade 0 é ajuste administrativo (fechar/
-    cancelar reserva ou ordem errada), não representa saída física — não conta como
-    "material já teve movimento" em NENHUM lugar que usar esse conceito, não só o
-    indicador 4 (por isso é uma função à parte, reutilizável)."""
+    DIFERENTE DE ZERO. Checa "!= 0", não só "< 0": baixa nessa planilha costuma vir
+    negativa na prática (confirmado contra a MB51 real), mas a regra de negócio não
+    depende dessa suposição de sinal. Baixa com quantidade exatamente 0 é ajuste
+    administrativo (fechar/cancelar reserva ou ordem errada), não representa saída
+    física — não conta como "material já teve movimento" em NENHUM lugar que usar
+    esse conceito, não só o indicador 4 (por isso é uma função à parte, reutilizável).
+
+    NÃO filtra por depósito — quem decide isso é o chamador, passando o recorte de
+    MB51 que fizer sentido pro caso de uso (ver materiais_nunca_movimentados, que
+    passa a MB51 inteira, D009 e D016 juntos: "já teve baixa alguma vez, em
+    qualquer depósito" é a pergunta, não "já teve baixa no depósito específico X")."""
     bwart_ok = df_mb51["_bwart_norm"].isin(config.BWART_BAIXA_REAL)
     quantidade = pd.to_numeric(df_mb51["Qtd.  UM registro"], errors="coerce").fillna(0)
-    baixas = df_mb51.loc[bwart_ok & (quantidade > 0)]
+    baixas = df_mb51.loc[bwart_ok & (quantidade != 0)]
     return set(_normalizar_material(baixas["Material"]))
 
 
@@ -298,18 +305,26 @@ def materiais_nunca_movimentados(
     total_materiais_vb: int,
     hoje: datetime.date,
 ) -> dict:
-    """Indicador 4 — Depósito D009, Classificação MRP = VB, SALDO POSITIVO
-    (Util.livre > 0 — material zerado é só cadastro sem estoque, não "capital físico
-    parado", não entra). Entra na lista quem NUNCA teve uma baixa/saída real (ver
-    _materiais_com_baixa_real — BWART_BAIXA_REAL com quantidade > 0) em TODO o
-    histórico disponível na MB51 — `df_mb51_completo` é o DataFrame cheio
-    (extratos.carregar_mb51), sem filtrar por dia, ao contrário dos outros
-    indicadores da MB51. Ter só entrada (comprou/recebeu, nunca saiu) NÃO tira o
-    material da lista — só saída real exclui.
+    """Indicador 4 — universo (candidatos): Depósito D009, Classificação MRP = VB,
+    SALDO POSITIVO (Util.livre > 0 — material zerado é só cadastro sem estoque, não
+    "capital físico parado", não entra).
 
-    "Data de Entrada" (pra Tempo Parado) é a PRIMEIRA linha de entrada
-    (config.BWART_RECEBIMENTO) em D009 pra aquele material; sem nenhuma entrada
-    registrada no período coberto pela MB51, fica None (Tempo Parado não é
+    A REGRA DE EXCLUSÃO ("já teve baixa real"), por outro lado, olha a MB51
+    COMPLETA — `df_mb51_completo` (extratos.carregar_mb51, sem filtro de dia) SEM
+    filtrar por depósito, D009 e D016 juntos (ver _materiais_com_baixa_real): a
+    pergunta é "esse material já saiu fisicamente alguma vez, em qualquer
+    depósito", não "já saiu do D009 especificamente". Não importa COMO o material
+    entrou (nota fiscal, ajuste de inventário, etc.) pra essa regra — só a saída
+    importa; o próprio saldo positivo na ZMM028 já prova que houve entrada, seja
+    qual for o tipo. Validado manualmente por Fernando, código por código, contra a
+    MB51 real: 2.637 candidatos - baixa real (qualquer depósito) = 495 nunca
+    movimentados.
+
+    "Data de Entrada" (só pra Tempo Parado — não afeta quem entra/sai da lista) é a
+    PRIMEIRA linha de entrada em config.BWART_ENTRADA_AMPLA (nota fiscal normal
+    101/835 + ajuste de inventário/entrada não-nota, legada e atual: 918/Z15/Z29/
+    701/920), também sem filtrar depósito, mesma lógica da baixa. Sem nenhuma
+    entrada registrada no período coberto pela MB51, fica None (Tempo Parado não é
     calculável, não estimado).
 
     `pct_valor_vb`: % do valor sobre o valor total dos materiais VB (mesma base de
@@ -321,13 +336,12 @@ def materiais_nunca_movimentados(
     vb = vb.loc[_util_livre(vb) > 0].copy()
     vb["_material_norm"] = _normalizar_material(vb["Material"])
 
-    mb51_d009 = df_mb51_completo.loc[df_mb51_completo["_deposito_norm"] == config.DEPOSITO_D009].copy()
-    mb51_d009["_material_norm"] = _normalizar_material(mb51_d009["Material"])
-
-    materiais_com_saida = _materiais_com_baixa_real(mb51_d009)
+    materiais_com_saida = _materiais_com_baixa_real(df_mb51_completo)
     nunca_mov = vb.loc[~vb["_material_norm"].isin(materiais_com_saida)]
 
-    entradas = mb51_d009.loc[mb51_d009["_bwart_norm"].isin(config.BWART_RECEBIMENTO)]
+    mb51_entrada = df_mb51_completo.copy()
+    mb51_entrada["_material_norm"] = _normalizar_material(mb51_entrada["Material"])
+    entradas = mb51_entrada.loc[mb51_entrada["_bwart_norm"].isin(config.BWART_ENTRADA_AMPLA)]
     primeira_entrada = entradas.groupby("_material_norm")["_data_norm"].min()
 
     mapa_preco = _mapa_preco_medio(df_mm60)
@@ -406,6 +420,217 @@ def classificacao_mrp(df_zmm028_todos_depositos: pd.DataFrame) -> dict:
         )
 
     return {"total": int(len(com_saldo)), "itens": itens}
+
+
+# ---- Indicador 6 — Avaliação de MRP (tela Gestão de Estoque) ----------------
+# Especificação final validada com Fernando 2026-08-24/25 contra dado real de
+# 21/08/2026, depois de duas rodadas de investigação de divergência: a primeira versão
+# (só D009) batia nos materiais com maior frequência de zeragem mas divergia no total
+# (351 vs 348 zeraram, 52 vs 44 críticos) e a segunda (D009+D016 somados mas com âncora
+# só do D009) fazia 17 materiais terminarem com saldo combinado NEGATIVO — impossível
+# fisicamente — porque a âncora de partida não incluía o saldo real que esses materiais
+# já tinham no D016 em 01/04. A versão final usa os DOIS arquivos-âncora (D009 e D016,
+# separados por decisão de rastreabilidade — ver config.SALDO_ANCORA_D009/D016_FILENAME)
+# somados por material, e isso eliminou os 17 saldos negativos por completo. Dois dos 5
+# materiais de maior frequência da validação original mudaram de resultado com a âncora
+# corrigida (805280 nunca mais zera — tinha saldo real no D016 que a âncora antiga não
+# via; 856949 caiu de 4x pra 3x) — Fernando confirmou os dois manualmente contra o SAP.
+
+DATA_REF_SALDO_ANCORA = datetime.date(2026, 4, 1)
+_CORTE_CRITICIDADE_ALTO = 0.7
+# ordem de exibição da tabela (pedido do usuário 2026-08-25: crítico no topo, depois
+# alto, depois médio) — não é ordem alfabética nem a ordem que GE_CRIT_LABEL usa no
+# front-end, é só o rank pra sort() abaixo.
+_ORDEM_NIVEL_CRITICIDADE = {"critico": 0, "alto": 1, "medio": 2}
+
+
+def _saldo_ancora_combinado(df_saldo_ancora_d009: pd.DataFrame, df_saldo_ancora_d016: pd.DataFrame) -> pd.DataFrame:
+    """Universo do indicador 6 (só Classificação MRP = VB, do arquivo D009 — o D016 não
+    tem essa coluna) com o saldo-âncora de 01/04/2026 já combinado (D009 + D016, soma
+    por material; quem não aparece no arquivo D016 entra com 0 ali, sem erro)."""
+    classe = df_saldo_ancora_d009["Classificacao MRP"].astype(str).str.strip()
+    vb = df_saldo_ancora_d009.loc[classe == "VB"].copy()
+    vb["_material_norm"] = _normalizar_material(vb["Material"])
+    vb["_saldo_d009"] = pd.to_numeric(vb["Saldo em 01/04/2026"], errors="coerce").fillna(0)
+    vb = vb.drop_duplicates(subset="_material_norm", keep="first")
+
+    d016 = df_saldo_ancora_d016.copy()
+    d016["_material_norm"] = _normalizar_material(d016["Material"])
+    d016["_saldo_d016"] = pd.to_numeric(d016["Saldo em 01/04/2026 (D016)"], errors="coerce").fillna(0)
+    mapa_d016 = d016.drop_duplicates(subset="_material_norm", keep="first").set_index("_material_norm")["_saldo_d016"]
+
+    vb["_saldo_ancora"] = vb["_saldo_d009"] + vb["_material_norm"].map(mapa_d016).fillna(0)
+    return vb
+
+
+def _reconstruir_saldo_material(movimentos: pd.DataFrame, saldo_inicial: float) -> dict:
+    """Caminha CRONOLOGICAMENTE, linha a linha (não agregado por dia — testado contra
+    dado real: agregar por dia escondia zeragens intra-dia que Fernando confirmou como
+    reais), pelos movimentos já combinados D009+D016 de UM material, a partir do saldo-
+    âncora combinado. `movimentos` precisa vir ordenado por data (ver avaliacao_mrp) e
+    com as colunas data/bwart/quantidade.
+
+    Transferência entre depósitos (313/315/311/... — qualquer tipo, sem lista fixa)
+    soma as duas pontas na mesma conta, então se cancela sozinha; só não cancela no
+    MESMO instante se as pontas caírem em linhas diferentes na ordem cronológica, o que
+    pode registrar uma zeragem tecnicamente real mas causada pelo trânsito da
+    transferência — aceito por decisão de Fernando (não filtramos por tipo de
+    movimento em lugar nenhum daqui, nem deduplicamos linha nenhuma da MB51)."""
+    saldo = saldo_inicial
+    zeragens = 0
+    ultimo_dia_zerou = None
+    datas_zeragem: list[datetime.date] = []
+    soma_saidas_reais = 0.0
+    ultimo_dia_mov = None
+
+    for row in movimentos.itertuples(index=False):
+        saldo_antes = saldo
+        saldo += row.quantidade
+        if row.quantidade < 0 and row.bwart in config.BWART_BAIXA_REAL:
+            soma_saidas_reais += row.quantidade
+        if row.data is not None:
+            ultimo_dia_mov = row.data
+        if saldo_antes > 0 and saldo <= 0:
+            zeragens += 1
+            ultimo_dia_zerou = row.data
+            datas_zeragem.append(row.data)
+
+    return {
+        "zeragens": zeragens,
+        "ultimo_dia_zerou": ultimo_dia_zerou,
+        "soma_saidas_reais": soma_saidas_reais,
+        "ultimo_dia_mov": ultimo_dia_mov,
+        "datas_zeragem": datas_zeragem,
+    }
+
+
+def _tempo_medio_reposicao(datas_zeragem: list, datas_entrada: list | None) -> float | None:
+    """Média de dias corridos entre cada zeragem e a entrada real (BWART_ENTRADA_AMPLA)
+    seguinte do MESMO material — inclui qualquer tempo "circulando" entre depósitos,
+    porque `datas_entrada` já vem do universo combinado D009+D016 (ver avaliacao_mrp).
+    Zeragem sem nenhuma entrada real depois dela (material ainda zerado, não repôs)
+    fica fora da média — não dá pra medir um intervalo que ainda não terminou. Material
+    sem NENHUM intervalo calculável devolve None, não 0 (mesma convenção de "não
+    calculável" de materiais_nunca_movimentados/_formatar_tempo_parado)."""
+    if not datas_entrada:
+        return None
+    intervalos = []
+    for data_zerou in datas_zeragem:
+        seguintes = [d for d in datas_entrada if d >= data_zerou]
+        if seguintes:
+            intervalos.append((min(seguintes) - data_zerou).days)
+    if not intervalos:
+        return None
+    return round(sum(intervalos) / len(intervalos), 1)
+
+
+def _classificar_criticidade(consumo_medio_mensal: float, estoque_maximo: float) -> tuple[str, int]:
+    """CRÍTICO: consumo médio mensal já ultrapassa o Estoque Máximo cadastrado —
+    matematicamente impossível não zerar com esse parâmetro (regra de negócio, ver
+    especificação). Sem isso, ALTO/MÉDIO pela proporção consumo/máximo — corte em 70%
+    é escolha de implementação (sem critério de negócio definido, Fernando autorizou
+    decidir), não um número validado por ele. `criticidade` (0-100, só pra largura da
+    barra visual) é sempre a proporção CAPADA em 100% — o rótulo textual de crítico não
+    usa esse número capado, mas também não expõe a proporção real (pode passar de
+    100%); é só pra barra não ficar maior que o próprio track."""
+    if estoque_maximo > 0:
+        proporcao = consumo_medio_mensal / estoque_maximo
+    else:
+        proporcao = 1.0 if consumo_medio_mensal > 0 else 0.0
+
+    if consumo_medio_mensal > estoque_maximo:
+        nivel = "critico"
+    elif proporcao >= _CORTE_CRITICIDADE_ALTO:
+        nivel = "alto"
+    else:
+        nivel = "medio"
+
+    criticidade = round(min(proporcao, 1.0) * 100)
+    return nivel, criticidade
+
+
+def avaliacao_mrp(
+    df_zmm028_d009: pd.DataFrame,
+    df_mb51_completo: pd.DataFrame,
+    df_saldo_ancora_d009: pd.DataFrame,
+    df_saldo_ancora_d016: pd.DataFrame,
+) -> dict:
+    """Indicador 6 — só materiais que zeraram (saldo combinado D009+D016 passou de
+    positivo pra zero/negativo) pelo menos 1 vez desde 01/04/2026. `df_zmm028_d009` é
+    só pra Estoque Mínimo/Máximo (Pt.reabast/Estq.máx.) — continua só D009, mesma fonte
+    dos indicadores 1/2, SEM mudança (decisão explícita de Fernando: combinar depósito
+    é só pra reconstrução de saldo/consumo, não pros parâmetros cadastrados)."""
+    ancora = _saldo_ancora_combinado(df_saldo_ancora_d009, df_saldo_ancora_d016)
+
+    mb51 = df_mb51_completo.loc[df_mb51_completo["_data_norm"] >= DATA_REF_SALDO_ANCORA].copy()
+    mb51["_material_norm"] = _normalizar_material(mb51["Material"])
+    tabela_mov = pd.DataFrame(
+        {
+            "material": mb51["_material_norm"],
+            "data": mb51["_data_norm"],
+            "bwart": mb51["_bwart_norm"],
+            "quantidade": pd.to_numeric(mb51["Qtd.  UM registro"], errors="coerce").fillna(0),
+        }
+    ).sort_values("data", kind="stable")
+    movimentos_por_material = {mat: grupo for mat, grupo in tabela_mov.groupby("material")}
+
+    entradas = tabela_mov.loc[tabela_mov["bwart"].isin(config.BWART_ENTRADA_AMPLA)]
+    entradas_por_material = {mat: sorted(grupo["data"].tolist()) for mat, grupo in entradas.groupby("material")}
+
+    zmm028 = df_zmm028_d009.copy()
+    zmm028["_material_norm"] = _normalizar_material(zmm028["Material"])
+    zmm028 = zmm028.drop_duplicates(subset="_material_norm", keep="first").set_index("_material_norm")
+
+    registros = []
+    for _, anc in ancora.iterrows():
+        material = anc["_material_norm"]
+        if material not in zmm028.index:
+            continue
+        movimentos = movimentos_por_material.get(material)
+        if movimentos is None or movimentos.empty:
+            continue
+
+        reconstrucao = _reconstruir_saldo_material(movimentos, anc["_saldo_ancora"])
+        if reconstrucao["zeragens"] == 0:
+            continue
+
+        linha_zmm028 = zmm028.loc[material]
+        estoque_minimo = pd.to_numeric(linha_zmm028["Pt.reabast"], errors="coerce")
+        estoque_minimo = float(estoque_minimo) if pd.notna(estoque_minimo) else 0.0
+        estoque_maximo = pd.to_numeric(linha_zmm028["Estq.máx."], errors="coerce")
+        estoque_maximo = float(estoque_maximo) if pd.notna(estoque_maximo) else 0.0
+
+        dias_decorridos = max((reconstrucao["ultimo_dia_mov"] - DATA_REF_SALDO_ANCORA).days, 1)
+        meses_decorridos = dias_decorridos / 30
+        consumo_medio_mensal = round(-reconstrucao["soma_saidas_reais"] / meses_decorridos, 2)
+
+        tempo_reposicao = _tempo_medio_reposicao(reconstrucao["datas_zeragem"], entradas_por_material.get(material))
+        nivel, criticidade = _classificar_criticidade(consumo_medio_mensal, estoque_maximo)
+
+        registros.append(
+            {
+                "material": material,
+                "descricao": str(linha_zmm028["Denom."]).strip(),
+                "classe": "VB",
+                "consumo": consumo_medio_mensal,
+                "vezesZerou": reconstrucao["zeragens"],
+                "ultimoZerou": reconstrucao["ultimo_dia_zerou"].strftime("%d/%m/%Y"),
+                "tempoReposicao": tempo_reposicao,
+                "min": round(estoque_minimo, 2),
+                "max": round(estoque_maximo, 2),
+                "criticidade": criticidade,
+                "nivel": nivel,
+            }
+        )
+
+    # Ordem da tabela: nível de criticidade primeiro (Crítico > Alto > Médio, ver
+    # _ORDEM_NIVEL_CRITICIDADE), % de criticidade decrescente dentro do mesmo nível —
+    # trocado de "vezes que zerou" pra isso a pedido do usuário 2026-08-25, pra quem
+    # abre a tela ver primeiro o que é mais grave agora, não só o que zerou mais vezes
+    # no passado (as duas coisas não são a mesma coisa — ver 808275 no histórico da
+    # conversa: zera bastante mas não é o mais crítico).
+    registros.sort(key=lambda r: (_ORDEM_NIVEL_CRITICIDADE[r["nivel"]], -r["criticidade"], r["material"]))
+    return {"qtd": len(registros), "itens": registros}
 
 
 # ---- Tela Checklist de Reservas (MB25 x ZMM028) -----------------------------

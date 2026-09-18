@@ -17,15 +17,34 @@ def _linha_mb51(material, deposito, bwart, data, referencia):
     return {
         "Material": material, "Texto breve material": "x", "Centro": "2003",
         "Depósito": deposito, "Tipo de movimento": bwart, "Data de lançamento": data,
-        "Qtd.  UM registro": 1, "UM registro": "UN", "Montante em MI": 1.0,
+        # -1: baixa real nessa planilha vem sempre com quantidade negativa (ver
+        # indicadores._materiais_com_baixa_real) — entradas (101) não olham o sinal.
+        "Qtd.  UM registro": -1, "UM registro": "UN", "Montante em MI": 1.0,
         "Reserva": "R1", "Referência": referencia, "Nome do usuário": "fernando",
     }
+
+
+def _escrever_saldos_ancora_vazios(tmp_path):
+    """Indicador 6 (Avaliação de MRP) precisa dos 2 arquivos-âncora mesmo vazios — só
+    header, 0 linhas — pra main.calcular_todos_indicadores não quebrar ao tentar ler
+    (eles moram fixos em config.MM60_DIR, igual a MM60). Vazio é suficiente pros testes
+    deste arquivo, que não exercitam avaliacao_mrp em si (ver backend/tests/
+    test_indicadores.py pra essa lógica)."""
+    import pandas as pd
+
+    pd.DataFrame(columns=["Material", "Classificacao MRP", "Saldo em 01/04/2026"]).to_excel(
+        tmp_path / config.SALDO_ANCORA_D009_FILENAME, index=False
+    )
+    pd.DataFrame(columns=["Material", "Saldo em 01/04/2026 (D016)"]).to_excel(
+        tmp_path / config.SALDO_ANCORA_D016_FILENAME, index=False
+    )
 
 
 def _preparar_bases(tmp_path, monkeypatch):
     # MM60 mora fixa em config.MM60_DIR (dentro do repo), não em bases_dir — redireciona
     # pro tmp_path do teste, senão main.py tentaria ler a MM60 real do projeto.
     monkeypatch.setattr(config, "MM60_DIR", str(tmp_path))
+    _escrever_saldos_ancora_vazios(tmp_path)
     mb51 = pd.DataFrame(
         [
             _linha_mb51("1001", "D009", 201, DIA1, "NF-A"),  # dia mais antigo
@@ -116,11 +135,16 @@ def test_calcula_indicadores_gestao_estoque_1_2_5(tmp_path, monkeypatch):
     assert item_nunca_mov["data_entrada"] is None
     assert item_nunca_mov["tempo_parado"] is None
 
+    # arquivos-âncora vazios (ver _escrever_saldos_ancora_vazios) -> universo VB do
+    # indicador 6 vazio, sem quebrar
+    assert resultado["avaliacao_mrp"] == {"qtd": 0, "itens": []}
+
 
 def test_materiais_nunca_movimentados_exclui_material_com_saida_registrada(tmp_path, monkeypatch):
     """Material 1004 TEM uma saída (BWART 201) na MB51 da fixture -> não pode entrar
     na lista de nunca movimentados, mesmo tendo saldo positivo na ZMM028."""
     monkeypatch.setattr(config, "MM60_DIR", str(tmp_path))
+    _escrever_saldos_ancora_vazios(tmp_path)
     mb51 = pd.DataFrame([_linha_mb51("1004", "D009", 201, DIA3, "NF-D")])
     mb25 = pd.DataFrame(
         [{"Reserva": "R1", "Material": "2001", "Texto breve material": "x", "Depósito": "D009",
@@ -146,6 +170,7 @@ def test_materiais_vb_sem_preco_mm60_aparece_no_resultado(tmp_path, monkeypatch)
     """MM60 vazia (nenhum preço cadastrado) -> o único material VB da fixture entra
     no alerta, e o valor dos indicadores 1/2 fica 0 (sem preço pra calcular gap/excesso)."""
     monkeypatch.setattr(config, "MM60_DIR", str(tmp_path))
+    _escrever_saldos_ancora_vazios(tmp_path)
     mb51 = pd.DataFrame([_linha_mb51("1001", "D009", 201, DIA3, "NF-D")])
     mb25 = pd.DataFrame(
         [{"Reserva": "R1", "Material": "2001", "Texto breve material": "x", "Depósito": "D009",
@@ -170,6 +195,7 @@ def test_materiais_vb_sem_preco_mm60_aparece_no_resultado(tmp_path, monkeypatch)
 
 def test_sem_segunda_data_no_arquivo_ontem_fica_none(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "MM60_DIR", str(tmp_path))
+    _escrever_saldos_ancora_vazios(tmp_path)
     mb51 = pd.DataFrame([_linha_mb51("1001", "D009", 201, DIA3, "NF-D")])
     mb25 = pd.DataFrame(
         [{"Reserva": "R1", "Material": "2001", "Texto breve material": "x", "Depósito": "D009",

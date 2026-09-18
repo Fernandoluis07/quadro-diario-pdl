@@ -54,6 +54,16 @@ def _preparar_bases(tmp_path):
     mm60 = pd.DataFrame([{"Material": "3001", "Centro": "2003", "Texto breve material": "A", "Preço": 10.0, "Moeda": "BRL"}])
     mm60.to_excel(tmp_path / "MM60Fixo" / config.MM60_FILENAME, index=False)
 
+    # Saldos-âncora do indicador 6 (Avaliação de MRP) — mesma pasta fixa da MM60 acima
+    # (ver config.SALDO_ANCORA_D009/D016_FILENAME); vazios bastam pra main.py não
+    # quebrar ao ler, a lógica em si é testada em backend/tests/test_indicadores.py.
+    pd.DataFrame(columns=["Material", "Classificacao MRP", "Saldo em 01/04/2026"]).to_excel(
+        tmp_path / "MM60Fixo" / config.SALDO_ANCORA_D009_FILENAME, index=False
+    )
+    pd.DataFrame(columns=["Material", "Saldo em 01/04/2026 (D016)"]).to_excel(
+        tmp_path / "MM60Fixo" / config.SALDO_ANCORA_D016_FILENAME, index=False
+    )
+
     manual_path = bases_dir / "planilha_manual_quadro_diario.xlsx"
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
@@ -99,7 +109,7 @@ def _isolar_repo_root(tmp_path, monkeypatch):
 
 def test_checar_arquivos_lista_o_que_falta(tmp_path):
     faltando = cabecalho._checar_arquivos(str(tmp_path), str(tmp_path / "manual.xlsx"))
-    assert len(faltando) == 5
+    assert len(faltando) == 7  # mb51, mb25, ZMM028, MM60, saldo âncora D009, saldo âncora D016, planilha manual
 
 
 def test_executar_aborta_sem_alterar_nada_quando_usuario_recusa_congelar(tmp_path, monkeypatch):

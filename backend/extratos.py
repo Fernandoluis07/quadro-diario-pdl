@@ -91,6 +91,8 @@ _COLUNAS_MB51 = {"Material", "Depósito", "Tipo de movimento", "Data de lançame
 _COLUNAS_MB25 = {"Reserva", "Material", "Depósito"}
 _COLUNAS_ZMM028 = {"Material", "Depósito", "Util.livre", "Val.total", "Pos.dpst.", "Tp.MRP"}
 _COLUNAS_MM60 = {"Material", "Preço"}
+_COLUNAS_SALDO_ANCORA_D009 = {"Material", "Classificacao MRP", "Saldo em 01/04/2026"}
+_COLUNAS_SALDO_ANCORA_D016 = {"Material", "Saldo em 01/04/2026 (D016)"}
 
 
 def carregar_mb51(caminho: str) -> pd.DataFrame:
@@ -148,3 +150,21 @@ def carregar_mm60(caminho: str) -> pd.DataFrame:
     df = _ler_excel(caminho, _COLUNAS_MM60)
     df = _descartar_linhas_rodape(df)
     return df
+
+
+def carregar_saldo_ancora_d009(caminho: str) -> pd.DataFrame:
+    """Saldo 'âncora' de cada material no D009 em 01/04/2026 — arquivo fixo (ver
+    config.SALDO_ANCORA_D009_FILENAME), ponto de partida da reconstrução dia a dia do
+    indicador 6 (Avaliação de MRP). Único dos dois arquivos-âncora com Classificação
+    MRP — é a fonte do universo VB desse indicador."""
+    df = _ler_excel(caminho, _COLUNAS_SALDO_ANCORA_D009)
+    return _descartar_linhas_rodape(df)
+
+
+def carregar_saldo_ancora_d016(caminho: str) -> pd.DataFrame:
+    """Saldo 'âncora' complementar no D016 em 01/04/2026 — SEM Classificação MRP
+    própria (quem só existe aqui não entra no indicador 6 por falta de classificação
+    conhecida; confirmado com Fernando que são todos ND, não é lacuna). Soma com o
+    saldo D009 por material em indicadores._saldo_ancora_combinado, não substitui."""
+    df = _ler_excel(caminho, _COLUNAS_SALDO_ANCORA_D016)
+    return _descartar_linhas_rodape(df)

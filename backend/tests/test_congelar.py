@@ -97,6 +97,7 @@ const CLASSIFICACAO_MRP = {"total":0,"itens":[]};
 const MATERIAIS_ABAIXO_MINIMO = {"itens":[]};
 const MATERIAIS_ACIMA_MAXIMO = {"itens":[]};
 const MATERIAIS_NUNCA_MOVIMENTADOS = {"itens":[]};
+const AVALIACAO_MRP = {"qtd":0,"itens":[]};
 </script>
 </body></html>
 """
@@ -157,6 +158,14 @@ INDICADORES_HOJE = {
         {"numero_reserva": "R1", "material": "100", "descricao": "Item A", "data_necessidade": "20/08/2026",
          "qtd_necessaria": 5.0, "centro_custo": "", "ordem": "O1", "saldo_atual": 42.0, "endereco": "A-01"},
     ],
+    "avaliacao_mrp": {
+        "qtd": 1,
+        "itens": [
+            {"material": "805280", "descricao": "Pincel pintura", "classe": "VB", "consumo": 9.78,
+             "vezesZerou": 3, "ultimoZerou": "14/08/2026", "tempoReposicao": 5.0,
+             "min": 10.0, "max": 24.0, "criticidade": 41, "nivel": "medio"},
+        ],
+    },
     "ontem": {
         "linhas_atendidas_d009": 2, "linhas_atendidas_d016": 0,
         "estornos_d009": 0, "estornos_d016": 0,
@@ -371,6 +380,7 @@ def test_congelar_dia_grava_os_5_json_e_atualiza_index_html(tmp_path):
     assert 'const MATERIAIS_ABAIXO_MINIMO = {"itens":[{"material":"100245"' in html_novo
     assert 'const MATERIAIS_ACIMA_MAXIMO = {"itens":[{"material":"100381"' in html_novo
     assert 'const MATERIAIS_NUNCA_MOVIMENTADOS = {"itens":[{"material":"100512"' in html_novo
+    assert 'const AVALIACAO_MRP = {"itens":[{"material":"805280"' in html_novo
 
 
 def test_congelar_dia_recusa_sobrescrever_dia_ja_congelado(tmp_path):
