@@ -170,11 +170,11 @@
     "estornos_valor_mes": 260272.79
   },
   "2026-09": {
-    "linhas_atendidas_mes": 771,
-    "valor_atendido_mes": -1628035.36,
+    "linhas_atendidas_mes": 769,
+    "valor_atendido_mes": -1626469.76,
     "reservas_mes": 373,
     "ordens_mes": 208,
-    "outros_mes": 190,
+    "outros_mes": 188,
     "top5_centro_custo": [
       {
         "centro_custo": "2003REC",
@@ -199,7 +199,7 @@
     ],
     "notas_recebidas_mes": 138,
     "valor_recebido_mes": 1309550.91,
-    "inventario_rotativo_mes": 829,
+    "inventario_rotativo_mes": 827,
     "estornos_qtd_mes": 79,
     "estornos_valor_mes": 348360.84
   }
