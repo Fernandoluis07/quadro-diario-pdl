@@ -73,7 +73,7 @@ const BLOCK2 = [
   { n:9,  title:'Pendências Atendimento Linhas', value:'0', yesterday:'0', deltaPct:0.0,  dir:'flat',   color:'magenta', icon:'alertCircle',    spark:[0,0] },
   { n:10, title:'Reservas Pendentes',            value:'0', yesterday:'0', deltaPct:0.0,  dir:'flat',   color:'aqua',    icon:'clipboard',      spark:[0,0] },
   { n:11, title:'Notas Aguardando Lançamento',   value:'0',  yesterday:'0',  deltaPct:0,     dir:'flat', color:'yellow', icon:'clipboardCheck', spark:[0,0] },
-  { n:12, title:'NF Pendente Faturamento',       value:'0',  yesterday:'0',  deltaPct:0, dir:'flat', color:'magenta', icon:'doc',            spark:[0,0] },
+  { n:12, title:'NF com Divergência',            value:'0',  yesterday:'0',  deltaPct:0, dir:'flat', color:'magenta', icon:'doc',            spark:[0,0] },
   { n:13, title:'Devolução',                     value:'0',  yesterday:'0',  deltaPct:0,   dir:'flat',   color:'magenta',   icon:'refresh',        spark:[0,0] },
 ];
 const BLOCK3 = [

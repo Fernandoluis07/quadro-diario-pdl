@@ -25,11 +25,11 @@ def formatar_inteiro_br(valor: int) -> str:
     return f"{valor:,}".replace(",", ".")
 
 
-def formatar_valor_estoque_milhares(valor: float) -> str:
-    """Valor em milhares de reais, arredondado pro milhar mais próximo, sem
-    decimais, ponto como separador de milhar (ex: 24.852.474,12 -> '24.852')."""
-    milhares = round(valor / 1_000)
-    return formatar_inteiro_br(milhares)
+def formatar_valor_estoque_mm(valor: float) -> str:
+    """Valor em milhões de reais ("MM"), 2 casas decimais, vírgula decimal
+    (ex: 24.852.474,12 -> '24,85 MM'). 2 casas preservam a resolução de ~R$ 10 mil
+    que o formato antigo em milhares (ex: '24.852') tinha."""
+    return f"{valor / 1_000_000:.2f}".replace(".", ",") + " MM"
 
 
 def calcular_delta(hoje: int, ontem: int) -> tuple[str, float]:
@@ -52,7 +52,7 @@ MAPEAMENTO_CARD = [
     ("pendencias_atendimento_linhas", "Pendências Atendimento Linhas", formatar_inteiro_br),
     ("reservas_pendentes", "Reservas Pendentes", formatar_inteiro_br),
     ("itens_estoque_com_saldo", "Itens em Estoque com Saldo", formatar_inteiro_br),
-    ("valor_estoque_total", "Valor do Estoque Total", formatar_valor_estoque_milhares),
+    ("valor_estoque_total", "Valor do Estoque Total", formatar_valor_estoque_mm),
     ("itens_mrp_saldo_zero", "Itens MRP Saldo Zero", formatar_inteiro_br),
     ("itens_sem_endereco", "Itens sem Endereço", formatar_inteiro_br),
 ]
@@ -78,7 +78,9 @@ MAPEAMENTO_CARD_COM_ONTEM = [
 # origem, mas viaja junto com o resto do Bloco 1 no front-end (ver backend/congelar.py).
 MAPEAMENTO_CARD_MANUAL_COM_ONTEM = [
     ("notas_aguardando_lancamento", "Notas Aguardando Lançamento", formatar_inteiro_br),
-    ("nf_pendente_faturamento", "NF Pendente Faturamento", formatar_inteiro_br),
+    # A chave interna e a coluna da planilha manual continuam "nf_pendente_faturamento" /
+    # "NF Pendente Faturamento" (ver planilha_manual.py) — só o rótulo do card mudou.
+    ("nf_pendente_faturamento", "NF com Divergência", formatar_inteiro_br),
     ("devolucao", "Devolução", formatar_inteiro_br),
     ("scanner_documentos", "Scanner de Documentos", formatar_inteiro_br),
 ]
