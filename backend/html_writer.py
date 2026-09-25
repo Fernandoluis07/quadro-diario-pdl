@@ -26,10 +26,10 @@ def formatar_inteiro_br(valor: int) -> str:
 
 
 def formatar_valor_estoque_mm(valor: float) -> str:
-    """Valor em milhões de reais ("MM"), 2 casas decimais, vírgula decimal
-    (ex: 24.852.474,12 -> '24,85 MM'). 2 casas preservam a resolução de ~R$ 10 mil
-    que o formato antigo em milhares (ex: '24.852') tinha."""
-    return f"{valor / 1_000_000:.2f}".replace(".", ",") + " MM"
+    """Valor em milhões de reais ("MM"), 3 casas decimais, vírgula decimal
+    (ex: 24.852.474,12 -> '24,852 MM'). 3 casas = resolução de ~R$ 1 mil (pedido do
+    usuário 2026-09-24: '27,816' em vez de '27,81')."""
+    return f"{valor / 1_000_000:.3f}".replace(".", ",") + " MM"
 
 
 def calcular_delta(hoje: int, ontem: int) -> tuple[str, float]:

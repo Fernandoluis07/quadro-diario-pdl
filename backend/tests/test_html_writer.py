@@ -49,9 +49,9 @@ def test_nao_toca_card_manual_contagem_pendentes():
 
 def test_formata_valor_estoque_total_em_milhoes_com_sufixo_mm():
     novo_html, aplicados, _ = html_writer.atualizar_html(HTML_SINTETICO, INDICADORES)
-    assert "title:'Valor do Estoque Total',     value:'28,79 MM'" in novo_html
+    assert "title:'Valor do Estoque Total',     value:'28,787 MM'" in novo_html
     item = next(a for a in aplicados if a["indicador"] == "valor_estoque_total")
-    assert item["valor_novo"] == "28,79 MM"
+    assert item["valor_novo"] == "28,787 MM"
 
 
 def test_reporta_titulo_nao_encontrado_quando_card_falta_no_html():
@@ -82,10 +82,11 @@ def test_formata_inteiros_com_separador_de_milhar_br():
     assert html_writer.formatar_inteiro_br(0) == "0"
 
 
-def test_formata_valor_estoque_mm_duas_casas_com_virgula():
-    assert html_writer.formatar_valor_estoque_mm(24852474.12) == "24,85 MM"
-    assert html_writer.formatar_valor_estoque_mm(28786943.43) == "28,79 MM"
-    assert html_writer.formatar_valor_estoque_mm(0) == "0,00 MM"
+def test_formata_valor_estoque_mm_tres_casas_com_virgula():
+    assert html_writer.formatar_valor_estoque_mm(24852474.12) == "24,852 MM"
+    assert html_writer.formatar_valor_estoque_mm(28786943.43) == "28,787 MM"
+    assert html_writer.formatar_valor_estoque_mm(27815600.00) == "27,816 MM"
+    assert html_writer.formatar_valor_estoque_mm(0) == "0,000 MM"
 
 
 def test_card_12_usa_o_novo_rotulo_nf_com_divergencia_mas_mantem_a_chave_interna():

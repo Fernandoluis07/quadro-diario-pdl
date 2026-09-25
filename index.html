@@ -239,13 +239,22 @@
 
   /* ---------- Checklist de Bipagem (vitrine visual, dados fictícios) ---------- */
   .bip-table td.num, .bip-table th.num{text-align:right;}
+  .bip-table td.ctr, .bip-table th.ctr{text-align:center; font-variant-numeric:tabular-nums;}
   .bip-table td.desc{white-space:normal; min-width:200px;}
-  .bip-table td.mov{font-variant-numeric:tabular-nums; color:var(--gray-700);}
-  /* Divergência: célula inteira preenchida (estilo Excel), fundo + texto da mesma cor */
+  .bip-table td.mov{color:var(--gray-700);}
+  /* grade em todas as células (estilo Excel); as bordas externas ficam por conta do
+     .checklist-table-wrap, senão a linha da borda sai dobrada */
+  .bip-table th, .bip-table td{border:1px solid var(--border);}
+  .bip-table thead th{border-top:0;}
+  .bip-table tr > :first-child{border-left:0;}
+  .bip-table tr > :last-child{border-right:0;}
+  /* Divergência: fundo da célula continua branco, a cor da categoria vai só num
+     contorno fino em volta do valor (.bip-tag) */
   .bip-table td.bip-cat{text-align:center; font-weight:800; font-variant-numeric:tabular-nums;}
-  .bip-table td.bip-cat.positivo{background:var(--green-bg); color:var(--green);}
-  .bip-table td.bip-cat.negativo{background:var(--red-bg); color:var(--red);}
-  .bip-table td.bip-cat.endereco, .bip-table td.bip-cat.nao-bipado{background:var(--blue-bg); color:var(--blue);}
+  .bip-tag{display:inline-block; min-width:44px; padding:2px 10px; border:1px solid currentColor; border-radius:4px; background:var(--card-bg);}
+  .bip-table td.bip-cat.positivo{color:var(--green);}
+  .bip-table td.bip-cat.negativo{color:var(--red);}
+  .bip-table td.bip-cat.endereco, .bip-table td.bip-cat.nao-bipado{color:var(--blue);}
 
   /* ---------- Checklist de Reservas (MB25 x ZMM028) ---------- */
   .checklist-header{display:flex; align-items:center; justify-content:space-between; gap:10px; flex:0 0 auto; padding-bottom:10px;}
@@ -1099,24 +1108,24 @@
               <th>Código</th>
               <th>Descrição</th>
               <th>UN</th>
-              <th>Tipo de Movimento</th>
+              <th class="ctr">Tipo de Movimento</th>
               <th>Responsável</th>
-              <th class="num">Saldo Sistema</th>
-              <th class="num">Saldo Contado</th>
-              <th class="num">Divergência</th>
+              <th class="ctr">Saldo Sistema</th>
+              <th class="ctr">Saldo Contado</th>
+              <th class="ctr">Divergência</th>
             </tr>
           </thead>
           <tbody>
-            <tr><td>21/09/2026</td><td>1002264</td><td class="desc">MANGUEIRA HIDRÁULICA 1/2 POL</td><td>M</td><td class="mov">261</td><td>Paulo Henrique</td><td class="num">30</td><td class="num">28</td><td class="bip-cat negativo">−2</td></tr>
-            <tr><td>21/09/2026</td><td>1007455</td><td class="desc">CABO FLEXÍVEL 2,5MM² AZUL</td><td>M</td><td class="mov">201</td><td>Marcos Pereira</td><td class="num">200</td><td class="num">200</td><td class="bip-cat endereco">Endereço incorreto</td></tr>
-            <tr><td>21/09/2026</td><td>1010093</td><td class="desc">BUCHA DE NYLON 12MM</td><td>UN</td><td class="mov">261</td><td>Juliana Ramos</td><td class="num">350</td><td class="num">362</td><td class="bip-cat positivo">+12</td></tr>
-            <tr><td>22/09/2026</td><td>1006719</td><td class="desc">ÓLEO LUBRIFICANTE ISO VG 68 20L</td><td>BD</td><td class="mov">201</td><td>Paulo Henrique</td><td class="num">6</td><td class="num">5</td><td class="bip-cat negativo">−1</td></tr>
-            <tr><td>22/09/2026</td><td>1011376</td><td class="desc">DISCO DE CORTE 7 POL</td><td>UN</td><td class="mov">201</td><td>Carlos Almeida</td><td class="num">60</td><td class="num"><span style="color:var(--gray-500)">Não bipado</span></td><td class="bip-cat nao-bipado">Não bipado</td></tr>
-            <tr><td>22/09/2026</td><td>1001188</td><td class="desc">ELETRODO E6013 3,25MM</td><td>KG</td><td class="mov">261</td><td>Juliana Ramos</td><td class="num">42</td><td class="num">45</td><td class="bip-cat positivo">+3</td></tr>
-            <tr><td>23/09/2026</td><td>1004521</td><td class="desc">PARAFUSO SEXTAVADO M10X50 ZINCADO</td><td>UN</td><td class="mov">261</td><td>Carlos Almeida</td><td class="num">120</td><td class="num">118</td><td class="bip-cat negativo">−2</td></tr>
-            <tr><td>23/09/2026</td><td>1012047</td><td class="desc">ROLAMENTO RÍGIDO 6205 2RS</td><td>UN</td><td class="mov">261</td><td>Juliana Ramos</td><td class="num">14</td><td class="num"><span style="color:var(--gray-500)">Não bipado</span></td><td class="bip-cat nao-bipado">Não bipado</td></tr>
-            <tr><td>23/09/2026</td><td>1008833</td><td class="desc">LUVA DE SEGURANÇA NITRÍLICA TAM. G</td><td>PR</td><td class="mov">201</td><td>Marcos Pereira</td><td class="num">85</td><td class="num">88</td><td class="bip-cat positivo">+3</td></tr>
-            <tr><td>23/09/2026</td><td>1003310</td><td class="desc">CORREIA EM V B-85</td><td>UN</td><td class="mov">261</td><td>Carlos Almeida</td><td class="num">9</td><td class="num">9</td><td class="bip-cat endereco">Endereço incorreto</td></tr>
+            <tr><td>21/09/2026</td><td>1002264</td><td class="desc">MANGUEIRA HIDRÁULICA 1/2 POL</td><td>M</td><td class="mov ctr">261</td><td>Paulo Henrique</td><td class="ctr">30</td><td class="ctr">28</td><td class="bip-cat negativo"><span class="bip-tag">−2</span></td></tr>
+            <tr><td>21/09/2026</td><td>1007455</td><td class="desc">CABO FLEXÍVEL 2,5MM² AZUL</td><td>M</td><td class="mov ctr">201</td><td>Marcos Pereira</td><td class="ctr">200</td><td class="ctr">200</td><td class="bip-cat endereco"><span class="bip-tag">Endereço incorreto</span></td></tr>
+            <tr><td>21/09/2026</td><td>1010093</td><td class="desc">BUCHA DE NYLON 12MM</td><td>UN</td><td class="mov ctr">261</td><td>Juliana Ramos</td><td class="ctr">350</td><td class="ctr">362</td><td class="bip-cat positivo"><span class="bip-tag">+12</span></td></tr>
+            <tr><td>22/09/2026</td><td>1006719</td><td class="desc">ÓLEO LUBRIFICANTE ISO VG 68 20L</td><td>BD</td><td class="mov ctr">201</td><td>Paulo Henrique</td><td class="ctr">6</td><td class="ctr">5</td><td class="bip-cat negativo"><span class="bip-tag">−1</span></td></tr>
+            <tr><td>22/09/2026</td><td>1011376</td><td class="desc">DISCO DE CORTE 7 POL</td><td>UN</td><td class="mov ctr">201</td><td>Carlos Almeida</td><td class="ctr">60</td><td class="ctr">—</td><td class="bip-cat nao-bipado"><span class="bip-tag">Não bipado</span></td></tr>
+            <tr><td>22/09/2026</td><td>1001188</td><td class="desc">ELETRODO E6013 3,25MM</td><td>KG</td><td class="mov ctr">261</td><td>Juliana Ramos</td><td class="ctr">42</td><td class="ctr">45</td><td class="bip-cat positivo"><span class="bip-tag">+3</span></td></tr>
+            <tr><td>23/09/2026</td><td>1004521</td><td class="desc">PARAFUSO SEXTAVADO M10X50 ZINCADO</td><td>UN</td><td class="mov ctr">261</td><td>Carlos Almeida</td><td class="ctr">120</td><td class="ctr">118</td><td class="bip-cat negativo"><span class="bip-tag">−2</span></td></tr>
+            <tr><td>23/09/2026</td><td>1012047</td><td class="desc">ROLAMENTO RÍGIDO 6205 2RS</td><td>UN</td><td class="mov ctr">261</td><td>Juliana Ramos</td><td class="ctr">14</td><td class="ctr">—</td><td class="bip-cat nao-bipado"><span class="bip-tag">Não bipado</span></td></tr>
+            <tr><td>23/09/2026</td><td>1008833</td><td class="desc">LUVA DE SEGURANÇA NITRÍLICA TAM. G</td><td>PR</td><td class="mov ctr">201</td><td>Marcos Pereira</td><td class="ctr">85</td><td class="ctr">88</td><td class="bip-cat positivo"><span class="bip-tag">+3</span></td></tr>
+            <tr><td>23/09/2026</td><td>1003310</td><td class="desc">CORREIA EM V B-85</td><td>UN</td><td class="mov ctr">261</td><td>Carlos Almeida</td><td class="ctr">9</td><td class="ctr">9</td><td class="bip-cat endereco"><span class="bip-tag">Endereço incorreto</span></td></tr>
           </tbody>
         </table>
       </div>
@@ -1265,7 +1274,7 @@ const BLOCK2 = [ // Pendências
 ];
 const BLOCK3 = [ // Fotografia do Estoque
   { n:14, title:'Itens em Estoque com Saldo', value:'5.310', yesterday:'5.345', deltaPct:0.36, dir:'up',   color:'aqua',  icon:'box',     spark:[5300,5320,5310,5335,5325,5350,5340,5364] },
-  { n:15, title:'Valor do Estoque Total',     value:'27,81 MM', yesterday:'28,59 MM', deltaPct:0.39, dir:'up',   color:'orange', icon:'cash',    spark:[28.0,28.15,28.05,28.3,28.2,28.45,28.35,28.7] },
+  { n:15, title:'Valor do Estoque Total',     value:'27,808 MM', yesterday:'28,590 MM', deltaPct:0.39, dir:'up',   color:'orange', icon:'cash',    spark:[28.0,28.15,28.05,28.3,28.2,28.45,28.35,28.7] },
   { n:16, title:'Itens MRP Saldo Zero',       value:'170',   yesterday:'160',   deltaPct:-2.5, dir:'down', color:'yellow',    icon:'warnTri', spark:[169,166,167,162,163,159,158,156] },
   { n:17, title:'Curva ABC',                  value:'30',    yesterday:'30',    deltaPct:0,    dir:'flat', color:'yellow', icon:'abcBars', spark:[30,30,30,30,30,30,30,30] },
   { n:18, title:'Itens sem Endereço',         value:'0',     yesterday:'0',     deltaPct:0,    dir:'flat', color:'aqua', icon:'pin',     spark:[0,0,0,0,0,0,0,0] },
@@ -1497,13 +1506,13 @@ function realSparklineValues(dOnly, historico, chave){
 }
 
 /* formata o valor exibido num card. "Valor do Estoque Total" (nº15) é a única grandeza
-   monetária entre os 20 — mostrado em milhões de reais ("MM"), 2 casas decimais, vírgula BR,
+   monetária entre os 20 — mostrado em milhões de reais ("MM"), 3 casas decimais, vírgula BR,
    igual a regra do backend real (ver formatar_valor_estoque_mm em backend/html_writer.py).
    Os outros 19 são contagem simples: mesmo assim levam separador de milhar (fmtInt, já usado
    no Resumo do Mês), porque alguns já passam de 999 no dado real (ex: Linhas Atendidas num
    dia grande) e ficariam ilegíveis sem isso. */
 function fmtCardValue(n, valorBruto){
-  if(n === 15) return (valorBruto/1e6).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' MM';
+  if(n === 15) return (valorBruto/1e6).toLocaleString('pt-BR', {minimumFractionDigits:3, maximumFractionDigits:3}) + ' MM';
   return fmtInt(valorBruto);
 }
 
