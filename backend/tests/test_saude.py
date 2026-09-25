@@ -246,3 +246,15 @@ def test_hook_pre_push_versionado_cancela_o_push_de_verdade(tmp_path):
     r = subprocess.run(["git", "push", "origin", "main"], cwd=w, capture_output=True, text=True)
     assert r.returncode != 0 and "PORTAO" in (r.stdout + r.stderr)
     assert subprocess.run(["git", "branch", "--list"], cwd=bare, capture_output=True, text=True).stdout.strip() == ""
+
+
+def test_dados_reconstruidos_so_avisa_dos_dias_ainda_nao_conferidos():
+    registro = {
+        "2026-08-31": {"snapshot": "2026-09-17", "conferido_em": "2026-09-24"},
+        "2026-09-04": {"snapshot": "2026-09-17"},
+    }
+    alertas = saude.checar_dados_reconstruidos(registro)
+    assert len(alertas) == 1
+    assert "1 dia(s)" in alertas[0]["titulo"] and "04/09" in alertas[0]["titulo"] and "31/08" not in alertas[0]["titulo"]
+    registro["2026-09-04"]["conferido_em"] = "2026-09-24"
+    assert saude.checar_dados_reconstruidos(registro) == []

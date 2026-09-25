@@ -13,7 +13,8 @@
     "sem_fonte_retroativa": [
       "historico_manuais",
       "historico_paineis"
-    ]
+    ],
+    "conferido_em": "2026-09-24"
   },
   "2026-09-04": {
     "metodo": "ZMM028 do snapshot mais recente com os movimentos da MB51 posteriores ao dia desfeitos",
@@ -29,7 +30,8 @@
     "sem_fonte_retroativa": [
       "historico_manuais",
       "historico_paineis"
-    ]
+    ],
+    "conferido_em": "2026-09-24"
   },
   "2026-09-05": {
     "metodo": "ZMM028 do snapshot mais recente com os movimentos da MB51 posteriores ao dia desfeitos",
@@ -45,6 +47,7 @@
     "sem_fonte_retroativa": [
       "historico_manuais",
       "historico_paineis"
-    ]
+    ],
+    "conferido_em": "2026-09-24"
   }
 }

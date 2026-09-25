@@ -244,11 +244,15 @@ def checar_codigo_sem_commit(repo_root: str, agora: datetime.datetime) -> list[d
 # ---- Info: dados reconstruídos ---------------------------------------------------
 
 def checar_dados_reconstruidos(registro: dict) -> list[dict]:
-    if not registro:
+    """Só avisa dos dias reconstruídos que ninguém conferiu ainda. Depois de conferir que o
+    dia foi publicado certo, grave "conferido_em" na entrada do dias_reconstruidos.json: o
+    registro de que o dado é aproximado continua lá, só o aviso a cada execução some."""
+    pendentes = sorted(d for d, info in registro.items() if not info.get("conferido_em"))
+    if not pendentes:
         return []
     return [_alerta(
         "dados_reconstruidos", "info",
-        f"{len(registro)} dia(s) com ZMM028 RECONSTRUÍDA (aproximada): {', '.join(_fmt(d) for d in sorted(registro))}",
+        f"{len(pendentes)} dia(s) com ZMM028 RECONSTRUÍDA (aproximada): {', '.join(_fmt(d) for d in pendentes)}",
         "Ver dias_reconstruidos.json — não são medição real.",
     )]
 
