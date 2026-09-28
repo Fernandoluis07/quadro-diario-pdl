@@ -1835,5 +1835,26 @@
     "inventario_rotativo_d009": 54,
     "inventario_rotativo_d016": 26,
     "intercompany": 0
+  },
+  "2026-09-25": {
+    "linhas_atendidas_d009": 50,
+    "linhas_atendidas_d016": 0,
+    "estornos_d009": 0,
+    "estornos_d016": 0,
+    "recebimentos_d009": 16,
+    "recebimentos_d016": 1,
+    "inventario_rotativo_d009": 52,
+    "inventario_rotativo_d016": 1,
+    "intercompany": 0
+  },
+  "2026-09-26": {
+    "linhas_atendidas_d009": 1,
+    "linhas_atendidas_d016": 0,
+    "estornos_d009": 0,
+    "estornos_d016": 0,
+    "recebimentos_d009": 2,
+    "recebimentos_d016": 0,
+    "inventario_rotativo_d009": 3,
+    "inventario_rotativo_d016": 0
   }
 }

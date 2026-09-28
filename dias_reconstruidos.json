@@ -49,5 +49,17 @@
       "historico_paineis"
     ],
     "conferido_em": "2026-09-24"
+  },
+  "2026-09-25": {
+    "metodo": "só os indicadores de saldo: ZMM028 da extração com os movimentos da MB51 posteriores ao dia desfeitos (dia útil congelado junto com o fim de semana)",
+    "snapshot": "2026-09-26",
+    "gerado_em": "2026-09-28T07:15:37",
+    "campos_reconstruidos": [
+      "itens_estoque_com_saldo",
+      "valor_estoque_total",
+      "itens_mrp_saldo_zero",
+      "itens_sem_endereco"
+    ],
+    "parcial": true
   }
 }
