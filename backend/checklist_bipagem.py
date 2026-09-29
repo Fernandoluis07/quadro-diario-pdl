@@ -135,6 +135,13 @@ def atualizar_sharepoint(caminho: str, tempo_limite: int = TEMPO_LIMITE_SHAREPOI
     import subprocess
     import tempfile
 
+    # planilha aberta no Excel de alguém = o Excel escondido para numa caixa invisível de "arquivo
+    # em uso" (28/09 23:42). Testa antes e nem abre o Excel.
+    try:
+        with open(caminho, "r+b"):
+            pass
+    except PermissionError:
+        raise ChecklistError("o Share Point.xlsx está ABERTO no Excel (seu ou de outra pessoa) — feche a planilha e rode de novo.")
     pid_arquivo = os.path.join(tempfile.gettempdir(), f"checklist_sp_excel_{os.getpid()}.pid")
     cmd = [sys.executable, "-m", "backend.checklist_bipagem", "--atualizar-sharepoint", caminho, "--pid-arquivo", pid_arquivo]
     proc = subprocess.Popen(cmd, cwd=REPO_ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -160,7 +167,11 @@ def _encerrar_meu_excel(pid_arquivo: str) -> None:
             pid = int(f.read().strip())
     except (OSError, ValueError):
         return
-    subprocess.run(["taskkill", "/PID", str(pid), "/F"], capture_output=True)
+    for _ in range(3):  # confere que fechou mesmo (28/09 23:42 um ficou aberto segurando a planilha)
+        vivo = str(pid) in subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True).stdout
+        if not vivo:
+            break
+        subprocess.run(["taskkill", "/PID", str(pid), "/F"], capture_output=True)
     try:
         os.remove(pid_arquivo)
     except OSError:
@@ -215,9 +226,21 @@ def _atualizar_no_excel(caminho: str, pid_arquivo: str) -> None:
     si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
     si.wShowWindow = 0  # SW_HIDE
     exe = EXCEL_EXE_PADRAO if os.path.exists(EXCEL_EXE_PADRAO) else "excel.exe"
-    excel = subprocess.Popen([exe, "/x", caminho], startupinfo=si)
+    excel = subprocess.Popen([exe, "/x", caminho], startupinfo=si, stdin=subprocess.DEVNULL,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True)
     with open(pid_arquivo, "w", encoding="utf-8") as f:
         f.write(str(excel.pid))
+    try:
+        _atualizar_no_excel_aberto(caminho, excel)
+    except BaseException:
+        excel.kill()  # qualquer falha: o próprio filho fecha o Excel que abriu
+        raise
+
+
+def _atualizar_no_excel_aberto(caminho: str, excel) -> None:
+    import time
+
+    import pythoncom
 
     pythoncom.CoInitialize()
     xl = None
@@ -480,13 +503,54 @@ def auditar(
     return novo, {"dias_auditados": auditados, "novas": novas}
 
 
+def situacao_atual(div: dict, sp: pd.DataFrame, cad: dict) -> dict | None:
+    """Relê a divergência só com as linhas da DATA ORIGINAL, contra o saldo e o endereço
+    GRAVADOS. None = corrigida. Senão devolve a divergência com a etiqueta ATUAL: um "Não
+    bipado" que foi bipado com saldo errado vira "−5"; com endereço errado vira "Endereço
+    incorreto" (Fernando 2026-09-28: o saldo errado aparecia como "Não bipado")."""
+    dia = datetime.date.fromisoformat(div["data_iso"])
+    bips = sp.loc[(sp["_dia"] == dia) & (sp["_mat"] == div["codigo"])]
+    _, op, _ = responsavel(div["matricula"], cad)
+    eleg = _bipagens_elegiveis(bips, op)
+    if eleg.empty:
+        return {**div, "categoria": "nao-bipado", "divergencia": "Não bipado", "saldo_contado": None}
+    ref = eleg.iloc[-1]
+    end_err = div["end_sistema"] is not None and ref["_end"] != _end(div["end_sistema"])
+    contagens = _contagens_validas(bips, op, _time(cad))
+    saldo = div["saldo_sistema"]
+    saldo_err = saldo is not None and not contagens.empty and not _bate(contagens, saldo)
+    if not end_err and not saldo_err:
+        return None
+    novo = dict(div)
+    if end_err:
+        novo.update(end_bipado=_cod(ref["END"]), bipado_por=_cod(ref["OPERADOR"]))
+    if saldo_err:
+        ult = contagens.iloc[-1]
+        contado = None if pd.isna(ult["_qtd"]) else float(ult["_qtd"])
+        novo.update(saldo_contado=contado, bipado_por=novo.get("bipado_por") or _cod(ult["OPERADOR"]))
+        dif = _diferenca(contado or 0.0, saldo)
+        if end_err:
+            novo.update(categoria="endereco-saldo", divergencia=f"{dif} e endereço")
+        else:
+            novo.update(categoria="positivo" if dif.startswith("+") else "negativo", divergencia=dif)
+    else:
+        novo.update(categoria="endereco", divergencia="Endereço incorreto",
+                    saldo_contado=None if pd.isna(ref["_qtd"]) else float(ref["_qtd"]))
+    return novo
+
+
 def reavaliar(estado: dict, sp: pd.DataFrame, cad: dict, agora: datetime.datetime) -> tuple[dict, list[dict]]:
-    """Checklist 2.0: só marca como corrigidas as abertas que passaram. Nunca acrescenta nada."""
+    """Checklist 2.0: marca como corrigidas as abertas que passaram e ATUALIZA a etiqueta das que
+    continuam abertas. Nunca acrescenta divergência nova."""
     corrigidas, divs = [], []
     for d in estado["divergencias"]:
-        if d["status"] == "aberta" and corrigida(d, sp, cad):
-            d = {**d, "status": "corrigida", "corrigida_em": agora.isoformat(timespec="seconds")}
-            corrigidas.append(d)
+        if d["status"] == "aberta":
+            atual = situacao_atual(d, sp, cad)
+            if atual is None:
+                d = {**d, "status": "corrigida", "corrigida_em": agora.isoformat(timespec="seconds")}
+                corrigidas.append(d)
+            else:
+                d = atual
         divs.append(d)
     return {**estado, "divergencias": divs}, corrigidas
 
@@ -571,19 +635,23 @@ def executar_2_0(index_path: str | None = None, atualizar: bool = True) -> int:
         return 1
     agora = datetime.datetime.now()
     novo, corrigidas = reavaliar(estado, sp, cad, agora)
+    etiquetas = [n for v, n in zip(estado["divergencias"], novo["divergencias"])
+                 if n["status"] == "aberta" and n["categoria"] != v["categoria"]]
     print(f"\nAntes: {antes}")
-    if not corrigidas:
-        print("Nenhuma divergência aberta foi corrigida no SharePoint desde a última atualização. Nada a gravar.")
+    if not corrigidas and not etiquetas:
+        print("Nenhuma divergência aberta mudou no SharePoint desde a última atualização. Nada a gravar.")
         return 0
     for d in corrigidas:
-        print(f"  ✔ {d['data']}  {d['codigo']}  {d['responsavel']:<20} {d['divergencia']}")
+        print(f"  ✔ {d['data']}  {d['codigo']}  {d['responsavel']:<20} {d['divergencia']} (corrigida)")
+    for d in etiquetas:
+        print(f"  ↻ {d['data']}  {d['codigo']}  {d['responsavel']:<20} agora: {d['divergencia']}")
     print(f"Depois: {resumo_texto(novo)}")
     if not cabecalho._confirmar("\nPosso gravar e subir pro GitHub?"):
         print("Ok, nada foi alterado.")
         return 0
     arquivos = gravar(REPO_ROOT, index_path, novo, agora)
     try:
-        cabecalho.subir_para_github(REPO_ROOT, None, arquivos, mensagem=f"Checklist de Bipagem 2.0: {len(corrigidas)} divergência(s) corrigida(s)")
+        cabecalho.subir_para_github(REPO_ROOT, None, arquivos, mensagem=f"Checklist de Bipagem 2.0: {len(corrigidas)} corrigida(s), {len(etiquetas)} com etiqueta atualizada")
     except RuntimeError as e:
         print(f"ERRO ao subir pro GitHub:\n{e}\nAs alterações ficaram salvas localmente.")
         return 1

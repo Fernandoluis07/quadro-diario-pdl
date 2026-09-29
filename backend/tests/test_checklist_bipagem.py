@@ -185,10 +185,15 @@ def test_2_0_nao_aceita_correcao_lancada_na_data_de_hoje():
     assert C.reavaliar(estado, hoje, CAD, AGORA)[1] == []
 
 
-def test_2_0_nao_bipado_so_sai_se_a_bipagem_nova_estiver_certa():
+def test_2_0_nao_bipado_bipado_errado_troca_a_etiqueta():
+    """Bipado depois na data original, mas com saldo errado: a linha vira "−5", não fica "Não bipado"."""
     estado = _uma_divergencia(_sp([]), _zmm([("100", 4, "0200100101")]))
-    errada = _sp([("2026-09-25 20:00", "100", "Fernando Sousa", "0999999999", 4)])
-    assert C.reavaliar(estado, errada, CAD, AGORA)[1] == []
+    errado = _sp([("2026-09-25 20:00", "100", "Fernando Sousa", "0200100101", 1)])
+    novo, corr = C.reavaliar(estado, errado, CAD, AGORA)
+    (d,) = novo["divergencias"]
+    assert corr == [] and d["status"] == "aberta" and d["categoria"] == "negativo" and d["divergencia"] == C.MENOS + "3"
+    end_errado = _sp([("2026-09-25 20:00", "100", "Fernando Sousa", "0999999999", 4)])
+    assert C.reavaliar(estado, end_errado, CAD, AGORA)[0]["divergencias"][0]["categoria"] == "endereco"
 
 
 def test_2_0_usa_o_saldo_gravado_e_nunca_cria_divergencia_nova():
