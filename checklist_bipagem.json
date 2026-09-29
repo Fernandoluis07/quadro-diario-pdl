@@ -149,15 +149,15 @@
       "saldos_aceitos": [
         1.0
       ],
-      "saldo_contado": null,
+      "saldo_contado": 0.0,
       "end_sistema": "0200316201",
       "end_bipado": null,
-      "bipado_por": null,
+      "bipado_por": "Geovane Abreu",
       "status": "aberta",
       "detectada_em": "2026-09-28T07:15:37",
       "corrigida_em": null,
-      "categoria": "nao-bipado",
-      "divergencia": "Não bipado"
+      "categoria": "negativo",
+      "divergencia": "−1"
     },
     {
       "id": "2026-09-25|803792|4873",
@@ -249,15 +249,15 @@
       "saldos_aceitos": [
         11.0
       ],
-      "saldo_contado": null,
+      "saldo_contado": 10.0,
       "end_sistema": "0200502302",
       "end_bipado": null,
-      "bipado_por": null,
+      "bipado_por": "Geovane Abreu",
       "status": "aberta",
       "detectada_em": "2026-09-28T07:15:37",
       "corrigida_em": null,
-      "categoria": "nao-bipado",
-      "divergencia": "Não bipado"
+      "categoria": "negativo",
+      "divergencia": "−1"
     },
     {
       "id": "2026-09-25|804348|4873",
@@ -579,15 +579,15 @@
       "saldos_aceitos": [
         41.0
       ],
-      "saldo_contado": null,
+      "saldo_contado": 41.0,
       "end_sistema": "0200321102",
-      "end_bipado": null,
-      "bipado_por": null,
+      "end_bipado": "0200403302",
+      "bipado_por": "Geovane Abreu",
       "status": "aberta",
       "detectada_em": "2026-09-28T07:15:37",
       "corrigida_em": null,
-      "categoria": "nao-bipado",
-      "divergencia": "Não bipado"
+      "categoria": "endereco",
+      "divergencia": "Endereço incorreto"
     },
     {
       "id": "2026-09-25|810421|4873",
@@ -604,15 +604,15 @@
       "saldos_aceitos": [
         613.0
       ],
-      "saldo_contado": null,
+      "saldo_contado": 608.0,
       "end_sistema": "0200511201",
       "end_bipado": null,
-      "bipado_por": null,
+      "bipado_por": "Geovane Abreu",
       "status": "aberta",
       "detectada_em": "2026-09-28T07:15:37",
       "corrigida_em": null,
-      "categoria": "nao-bipado",
-      "divergencia": "Não bipado"
+      "categoria": "negativo",
+      "divergencia": "−5"
     },
     {
       "id": "2026-09-25|814649|4873",
