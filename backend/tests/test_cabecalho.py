@@ -107,27 +107,120 @@ def _isolar_repo_root(tmp_path, monkeypatch):
     return tmp_path
 
 
-# A MB51 sintética tem movimento em 09/08 e 10/08 — um histórico "consistente" precisa ter
-# os DOIS congelados, senão o alerta de dia pulado (backend/saude.py) barra o teste com razão.
+# A MB51 sintética tem movimento em 09/08 e 10/08 — histórico com os DOIS congelados = nada
+# pendente (só reprocessamento forçado, com senha).
 _HISTORICO_CONSISTENTE = {
     "2026-08-09": {"linhas_atendidas_d009": 0, "intercompany": 0},
     "2026-08-10": {"linhas_atendidas_d009": 0},
 }
 
 
-def test_executar_bloqueia_dia_pulado_e_so_segue_digitando_continuar(tmp_path, monkeypatch, capsys):
+def _adicionar_linha_manual(manual_path, data_br):
+    wb = openpyxl.load_workbook(manual_path)
+    wb["Indicadores Diarios"].append([data_br, 1, 1, 1, 1, 7])
+    wb.save(manual_path)
+
+
+def _ler(tmp_path, nome):
+    return json.loads((tmp_path / nome).read_text(encoding="utf-8"))
+
+
+def test_planejar_dias_pega_todos_os_dias_depois_do_ultimo_congelado():
+    d = datetime.date
+    datas = {d(2026, 9, 24), d(2026, 9, 25), d(2026, 9, 26)}
+    assert cabecalho.planejar_dias(datas, {"2026-09-24"}) == [d(2026, 9, 25), d(2026, 9, 26)]
+    assert cabecalho.planejar_dias(datas, set()) == [d(2026, 9, 26)]  # repositório novo: só o último
+    assert cabecalho.planejar_dias(datas, {"2026-09-26"}) == []
+
+
+def test_planejar_dias_recusa_mb51_que_nao_alcanca_o_ultimo_dia_congelado():
+    d = datetime.date
+    with pytest.raises(cabecalho.PlanoError, match="depois do último dia congelado"):
+        cabecalho.planejar_dias({d(2026, 9, 28)}, {"2026-09-24"})
+
+
+def test_executar_recusa_mb51_sem_sobreposicao_e_nao_grava_nada(tmp_path, monkeypatch, capsys):
     bases_dir, manual_path = _preparar_bases(tmp_path)
     index_path = _preparar_index(tmp_path)
-    # 09/08 tem movimento na MB51 mas nunca foi congelado; só 07/08 está no histórico
+    # MB51 começa em 09/08; último congelado é 07/08 — o 08/08 pode estar faltando
     (tmp_path / "historico_mb51.json").write_text(json.dumps({"2026-08-07": {"linhas_atendidas_d009": 0}}), encoding="utf-8")
 
-    monkeypatch.setattr("builtins.input", lambda _: "nao")
+    monkeypatch.setattr("builtins.input", lambda _: pytest.fail("não deveria perguntar nada"))
     codigo = cabecalho.executar(bases_dir=bases_dir, manual_path=manual_path, index_path=index_path)
 
-    saida = capsys.readouterr().out
     assert codigo == 1
-    assert "nunca foram congelados: 09/08" in saida
-    assert json.loads((tmp_path / "historico_mb51.json").read_text(encoding="utf-8")) == {"2026-08-07": {"linhas_atendidas_d009": 0}}
+    assert "depois do último dia congelado" in capsys.readouterr().out
+    assert _ler(tmp_path, "historico_mb51.json") == {"2026-08-07": {"linhas_atendidas_d009": 0}}
+
+
+def test_executar_congela_domingo_so_com_os_8_da_mb51_e_segunda_completa(tmp_path, monkeypatch):
+    """09/08/2026 é DOMINGO com movimento, 10/08 segunda — chegam na mesma extração e os dois
+    são congelados (antes a trava de dia pulado barrava)."""
+    bases_dir, manual_path = _preparar_bases(tmp_path)
+    index_path = _preparar_index(tmp_path)
+    mb51 = pd.read_excel(f"{bases_dir}/{config.MB51_FILENAME}", dtype=str)
+    extra = pd.DataFrame([_linha_mb51("1000", "D009", 201, "07.08.2026", "NF-X")]).astype(str)
+    pd.concat([extra, mb51]).to_excel(f"{bases_dir}/{config.MB51_FILENAME}", index=False)
+    (tmp_path / "historico_mb51.json").write_text(json.dumps({"2026-08-07": {"linhas_atendidas_d009": 1, "intercompany": 0}}), encoding="utf-8")
+
+    respostas = iter(["s", "n"])  # "Posso congelar?", "Posso subir?"
+    monkeypatch.setattr("builtins.input", lambda _: next(respostas))
+    codigo = cabecalho.executar(bases_dir=bases_dir, manual_path=manual_path, index_path=index_path)
+
+    assert codigo == 0
+    h = _ler(tmp_path, "historico_mb51.json")
+    assert set(h) == {"2026-08-07", "2026-08-09", "2026-08-10"}
+    assert h["2026-08-09"]["linhas_atendidas_d009"] == 1
+    assert "intercompany" not in h["2026-08-09"]  # card 19 é manual: fim de semana repete o dia útil
+    assert h["2026-08-10"]["intercompany"] == 2
+    assert set(_ler(tmp_path, "historico_manuais.json")) == {"2026-08-10"}  # domingo não tem manual
+    assert set(_ler(tmp_path, "historico_zmm028.json")) == {"2026-08-10"}
+
+
+def test_executar_sexta_com_sabado_na_mesma_extracao_reconstroi_os_4_saldos(tmp_path, monkeypatch):
+    """Sexta 07/08 + sábado 08/08: a ZMM028 foi tirada depois do sábado, então os 4 indicadores
+    de saldo da sexta desfazem o sábado. Material 3001: 10 na foto, sábado baixou 10 -> na
+    sexta tinha 20 (saldo, valor), e ninguém fica zerado."""
+    bases_dir, manual_path = _preparar_bases(tmp_path)
+    index_path = _preparar_index(tmp_path)
+    sab = _linha_mb51("3001", "D009", 201, "08.08.2026", "NF-S", valor=-100.0)
+    sab["Qtd.  UM registro"] = -10
+    pd.DataFrame([
+        _linha_mb51("1000", "D009", 201, "06.08.2026", "NF-Q"),
+        _linha_mb51("1001", "D009", 201, "07.08.2026", "NF-F"),
+        sab,
+    ]).to_excel(f"{bases_dir}/{config.MB51_FILENAME}", index=False)
+    _adicionar_linha_manual(manual_path, "07/08/2026")
+    (tmp_path / "historico_mb51.json").write_text(json.dumps({"2026-08-06": {"linhas_atendidas_d009": 1, "intercompany": 0}}), encoding="utf-8")
+
+    respostas = iter(["s", "n"])
+    monkeypatch.setattr("builtins.input", lambda _: next(respostas))
+    assert cabecalho.executar(bases_dir=bases_dir, manual_path=manual_path, index_path=index_path) == 0
+
+    zmm = _ler(tmp_path, "historico_zmm028.json")["2026-08-07"]
+    assert zmm["itens_estoque_com_saldo"] == 1
+    assert zmm["valor_estoque_total"] == 200.0  # foto 100 + os 100 que o sábado baixou
+    assert set(_ler(tmp_path, "historico_mb51.json")) == {"2026-08-06", "2026-08-07", "2026-08-08"}
+    registro = _ler(tmp_path, "dias_reconstruidos.json")
+    assert list(registro) == ["2026-08-07"] and registro["2026-08-07"]["parcial"] is True
+
+
+def test_executar_deixa_o_dia_em_aberto_de_fora_sem_continuar(tmp_path, monkeypatch, capsys):
+    bases_dir, manual_path = _preparar_bases(tmp_path)
+    index_path = _preparar_index(tmp_path)
+    hoje = datetime.date.today()
+    mb51 = pd.read_excel(f"{bases_dir}/{config.MB51_FILENAME}", dtype=str)
+    extra = pd.DataFrame([_linha_mb51("1009", "D009", 201, hoje.strftime("%d.%m.%Y"), "NF-9")]).astype(str)
+    pd.concat([mb51, extra]).to_excel(f"{bases_dir}/{config.MB51_FILENAME}", index=False)
+    (tmp_path / "historico_mb51.json").write_text(json.dumps(_HISTORICO_CONSISTENTE_ANTERIOR), encoding="utf-8")
+
+    respostas = iter(["", "s", "n"])  # Enter no dia em aberto, "Posso congelar?", "Posso subir?"
+    monkeypatch.setattr("builtins.input", lambda _: next(respostas))
+    codigo = cabecalho.executar(bases_dir=bases_dir, manual_path=manual_path, index_path=index_path)
+
+    assert codigo == 0
+    assert "AINDA NÃO ACABOU" in capsys.readouterr().out
+    assert set(_ler(tmp_path, "historico_mb51.json")) == {"2026-08-09", "2026-08-10"}
 
 
 def test_executar_bloqueia_congelar_o_dia_de_hoje_que_ainda_nao_acabou(tmp_path, monkeypatch, capsys):
@@ -148,14 +241,18 @@ def test_executar_bloqueia_congelar_o_dia_de_hoje_que_ainda_nao_acabou(tmp_path,
 def test_executar_continua_quando_usuario_digita_continuar_no_bloqueio(tmp_path, monkeypatch):
     bases_dir, manual_path = _preparar_bases(tmp_path)
     index_path = _preparar_index(tmp_path)
-    (tmp_path / "historico_mb51.json").write_text(json.dumps({"2026-08-07": {"linhas_atendidas_d009": 0}}), encoding="utf-8")
+    hoje = datetime.date.today()
+    pd.DataFrame([_linha_mb51("1001", "D009", 201, hoje.strftime("%d.%m.%Y"), "NF-9")]).to_excel(
+        f"{bases_dir}/{config.MB51_FILENAME}", index=False
+    )
+    _adicionar_linha_manual(manual_path, hoje.strftime("%d/%m/%Y"))
 
     respostas = iter(["CONTINUAR", "s", "n"])  # override do alerta, "Posso congelar?", "Posso subir?"
     monkeypatch.setattr("builtins.input", lambda _: next(respostas))
     codigo = cabecalho.executar(bases_dir=bases_dir, manual_path=manual_path, index_path=index_path)
 
     assert codigo == 0
-    assert "2026-08-10" in json.loads((tmp_path / "historico_mb51.json").read_text(encoding="utf-8"))
+    assert hoje.isoformat() in _ler(tmp_path, "historico_mb51.json")
 
 
 def _executar_ate_o_push(tmp_path, monkeypatch, alertas):

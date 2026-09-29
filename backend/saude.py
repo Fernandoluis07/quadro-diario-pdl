@@ -3,8 +3,10 @@ r"""Alerta ativo de saúde do sistema — o sistema NÃO pode falhar em silênci
 Cada checagem devolve uma lista de alertas {codigo, nivel, titulo, detalhe}; nível
 "critico" (precisa de ação agora), "aviso" (atenção) ou "info". Quatro famílias:
 
-  1. SEQUÊNCIA   — dia com movimento na MB51 que nunca foi congelado (pulado); congelar um
-                   dia ANTERIOR a um já congelado (fora de sequência).
+  1. SEQUÊNCIA   — dia com movimento na MB51 ainda não congelado depois do prazo (atrasado).
+                   Só AVISA desde 2026-09-27: o Cabeçalho congela TODOS os dias pendentes de
+                   uma vez (sexta + sábado na mesma extração), então não existe mais "dia
+                   pulado" a destravar — o risco que sobra é ninguém rodar o Cabeçalho.
   2. EXTRAÇÃO    — MB51/ZMM028/MB25/planilha manual desatualizada; MB51 sem os últimos dias;
                    ZMM028 e MB51 extraídas em horários muito diferentes (saldo e movimento
                    deixam de ser do mesmo instante).
@@ -16,8 +18,8 @@ Cada checagem devolve uma lista de alertas {codigo, nivel, titulo, detalhe}; ní
                    ninguém mais vê e que pode se perder ou ser sobrescrito).
 
 Como o alerta chega até você sem você ir procurar:
-  - Cabeçalho: banner no início e no fim de toda execução; alertas críticos de sequência/dia
-    em aberto BLOQUEIAM o congelamento até digitar CONTINUAR (ver cabecalho.executar).
+  - Cabeçalho: banner no início e no fim de toda execução; dia em aberto só é congelado
+    digitando CONTINUAR (ver cabecalho.executar).
   - Site (index.html): faixa vermelha no topo, com checagem AO VIVO (último dia congelado x
     relógio) + o arquivo alertas_saude.js gerado por este módulo. Se esse arquivo parar de ser
     atualizado, a própria faixa avisa (o verificador também não pode falhar em silêncio).
@@ -105,31 +107,32 @@ def checar_sequencia(
     datas_esperadas: set[datetime.date],
     congelados: set[str],
     agora: datetime.datetime,
-    hoje_a_congelar: datetime.date | None = None,
 ) -> list[dict]:
-    """`datas_esperadas`: dias que DEVEM estar congelados (dias com movimento na MB51; ou,
-    no modo rápido, dias úteis do calendário). Dia em aberto (>= hoje) nunca é 'pulado'."""
+    """`datas_esperadas`: dias que DEVEM estar congelados (dias com movimento em D009/D016 na
+    MB51; ou, no modo rápido, dias úteis do calendário). Só conta depois do prazo (11h do
+    próximo dia útil). Os dias DEPOIS do último congelado o Cabeçalho congela sozinho na
+    próxima execução; buraco ANTES dele (dia antigo que ficou de fora) precisa de
+    python -m backend.reconstruir."""
+    candidatos = [d for d in datas_esperadas if agora >= prazo_de_congelamento(d)]
+    atrasados = sorted(d for d in candidatos if d >= INICIO_HISTORICO and d.isoformat() not in congelados)
+    if not atrasados:
+        return []
+    ultimo = max(congelados) if congelados else ""
+    buracos = [d for d in atrasados if d.isoformat() < ultimo]
+    pendentes = [d for d in atrasados if d.isoformat() > ultimo]
     alertas = []
-    if hoje_a_congelar is not None:
-        candidatos = [d for d in datas_esperadas if d < hoje_a_congelar]
-    else:
-        candidatos = [d for d in datas_esperadas if agora >= prazo_de_congelamento(d)]
-    pulados = sorted(d for d in candidatos if d >= INICIO_HISTORICO and d.isoformat() not in congelados)
-    if pulados:
+    if pendentes:
         alertas.append(_alerta(
-            "dia_pulado", "critico",
-            f"{len(pulados)} dia(s) nunca foram congelados: {', '.join(_fmt(d) for d in pulados)}",
-            "Cada dia fora do histórico fica bloqueado no Calendário e some dos gráficos. "
-            "Para dias antigos use python -m backend.reconstruir.",
+            "dia_atrasado", "aviso",
+            f"{len(pendentes)} dia(s) com movimento ainda não congelados: {', '.join(_fmt(d) for d in pendentes)}",
+            "Rode o Cabeçalho — ele congela todos os dias pendentes de uma vez.",
         ))
-    if hoje_a_congelar is not None and congelados:
-        posteriores = sorted(d for d in congelados if d > hoje_a_congelar.isoformat())
-        if posteriores:
-            alertas.append(_alerta(
-                "fora_de_sequencia", "critico",
-                f"Congelar {_fmt(hoje_a_congelar)} FORA DE SEQUÊNCIA: já existe {_fmt(posteriores[-1])} congelado",
-                "Congelar um dia anterior a um dia já congelado reescreve o Início com dado velho.",
-            ))
+    if buracos:
+        alertas.append(_alerta(
+            "dia_pulado", "aviso",
+            f"{len(buracos)} dia(s) antigos ficaram fora do histórico: {', '.join(_fmt(d) for d in buracos)}",
+            "Ficam bloqueados no Calendário. Para dias antigos use python -m backend.reconstruir.",
+        ))
     return alertas
 
 
@@ -143,14 +146,23 @@ def checar_dia_em_aberto(hoje_a_congelar: datetime.date, agora: datetime.datetim
     return []
 
 
-def checar_dias_fechados_incompletos(mb51, historico_mb51: dict, calcular_dia, ultimos: int = DIAS_FECHADOS_A_CONFERIR) -> list[dict]:
+def checar_dias_fechados_incompletos(
+    mb51, historico_mb51: dict, calcular_dia, ultimos: int = DIAS_FECHADOS_A_CONFERIR,
+    detalhe_congelado: dict | None = None, detalhe_dia=None,
+) -> list[dict]:
     """Recalcula os últimos dias congelados a partir da MB51 COMPLETA de hoje e compara com o
-    que foi congelado: diferença = o dia foi fechado antes de todo o movimento ser lançado."""
+    que foi congelado: diferença = lançamento retroativo em dia já fechado. SÓ AVISA (Fernando
+    2026-09-28: ele decide se corrige). Com o detalhe do congelamento (historico_mb51_detalhe.json)
+    o aviso diz o material/nota, o valor antigo e o novo."""
     alertas = []
     for iso in sorted(historico_mb51)[-ultimos:]:
         atual = calcular_dia(mb51, datetime.date.fromisoformat(iso))
         difs = [f"{c}: congelado {historico_mb51[iso].get(c)} x MB51 hoje {atual.get(c)}"
                 for c in CAMPOS_CONFERIDOS if historico_mb51[iso].get(c) != atual.get(c)]
+        if difs and detalhe_dia is not None and detalhe_congelado and iso in detalhe_congelado:
+            from .historico import diferencas_detalhe
+
+            difs += ["por material: " + "; ".join(diferencas_detalhe(detalhe_congelado[iso], detalhe_dia(mb51, datetime.date.fromisoformat(iso))))]
         if difs:
             alertas.append(_alerta(
                 "dia_fechado_incompleto", "aviso",
@@ -277,11 +289,6 @@ def _mtimes(bases_dir: str, manual: str) -> dict:
             "MB25.xlsx": m(os.path.join(bases_dir, "MB25.xlsx")), "planilha manual": m(manual)}
 
 
-def checar_antes_de_congelar(hoje: datetime.date, mb51, historico_mb51: dict, agora: datetime.datetime, datas_mb51: set) -> list[dict]:
-    """Só o que BLOQUEIA o congelamento (chamado por cabecalho.executar)."""
-    return checar_dia_em_aberto(hoje, agora) + checar_sequencia(datas_mb51, set(historico_mb51), agora, hoje)
-
-
 def verificar(
     repo_root: str = REPO_ROOT,
     bases_dir: str | None = None,
@@ -302,9 +309,15 @@ def verificar(
     if mb51 is None and ler_mb51 and os.path.exists(os.path.join(bases_dir, config.MB51_FILENAME)):
         mb51 = extratos.carregar_mb51(os.path.join(bases_dir, config.MB51_FILENAME))
     if mb51 is not None:
-        datas = {d for d in extratos.datas_disponiveis(mb51) if d is not None}
-        ultima = max(datas) if datas else None
-        alertas += checar_dias_fechados_incompletos(mb51, historico_mb51, historico._calcular_dia)
+        ultima = max((d for d in extratos.datas_disponiveis(mb51) if d is not None), default=None)
+        # só dia com movimento nos 8 indicadores (D009/D016) precisa estar congelado: sábado com
+        # linha só de outro depósito não entra no histórico e não pode virar alerta eterno
+        validos = mb51.loc[mb51["_deposito_norm"].isin(config.DEPOSITOS_VALIDOS), "_data_norm"]
+        datas = {d for d in validos if d is not None}
+        alertas += checar_dias_fechados_incompletos(
+            mb51, historico_mb51, historico._calcular_dia,
+            detalhe_congelado=_carregar(os.path.join(repo_root, historico.ARQUIVO_DETALHE)), detalhe_dia=historico.detalhe_dia,
+        )
     else:
         datas = {INICIO_HISTORICO + datetime.timedelta(days=i) for i in range((agora.date() - INICIO_HISTORICO).days)
                  if eh_dia_util(INICIO_HISTORICO + datetime.timedelta(days=i))}
@@ -377,9 +390,60 @@ def criticos_pendentes(repo_root: str = REPO_ROOT, bases_dir: str | None = None,
     return [a for a in verificar(repo_root=repo_root, bases_dir=bases_dir, agora=agora, mb51=mb51) if a["nivel"] == "critico"]
 
 
-def portao_de_push(repo_root: str = REPO_ROOT, bases_dir: str | None = None, mb51=None) -> int:
+# Commit da Checklist de Bipagem 2.0 (opção B, Fernando 2026-09-26): a Checklist trabalha direto
+# em cima da ZMM028/MB51 e não depende do congelamento — um push que só mexe nela passa pelo
+# portão mesmo com alerta pendente. "Só nela" = arquivos desta lista e, no index.html, só a
+# linha da constante CHECKLIST_BIPAGEM.
+ARQUIVOS_SO_CHECKLIST = {"checklist_bipagem.json", "index.html"}
+LINHA_CHECKLIST_NO_INDEX = "const CHECKLIST_BIPAGEM = "
+SHA_VAZIO = "0" * 40
+
+
+def commits_so_da_checklist(repo_root: str, faixas: list[tuple[str, str]]) -> bool:
+    """`faixas`: (sha remoto, sha local) de cada ref sendo enviada (stdin do hook pre-push).
+    True só se TODA a diferença for da Checklist; na dúvida (ref nova, erro do git), False."""
+    if not faixas:
+        return False
+    for remoto, local in faixas:
+        if local == SHA_VAZIO:
+            continue  # apagando uma ref remota: nada de conteúdo sendo enviado
+        if remoto == SHA_VAZIO:
+            return False
+        r = _git(repo_root, "diff", "--name-only", f"{remoto}..{local}")
+        if r.returncode != 0:
+            return False
+        arquivos = {l.strip() for l in r.stdout.splitlines() if l.strip()}
+        if not arquivos or not arquivos <= ARQUIVOS_SO_CHECKLIST:
+            return False
+        if "index.html" in arquivos:
+            d = _git(repo_root, "diff", "-U0", f"{remoto}..{local}", "--", "index.html")
+            if d.returncode != 0:
+                return False
+            mudadas = [l[1:] for l in d.stdout.splitlines()
+                       if l[:1] in "+-" and not l.startswith(("+++", "---"))]
+            if any(not l.startswith(LINHA_CHECKLIST_NO_INDEX) for l in mudadas):
+                return False
+    return True
+
+
+def _faixas_do_stdin(texto: str) -> list[tuple[str, str]]:
+    """Linhas '<ref local> <sha local> <ref remota> <sha remoto>' que o git manda pro pre-push."""
+    faixas = []
+    for linha in texto.splitlines():
+        partes = linha.split()
+        if len(partes) == 4:
+            faixas.append((partes[3], partes[1]))
+    return faixas
+
+
+def portao_de_push(repo_root: str = REPO_ROOT, bases_dir: str | None = None, mb51=None,
+                   faixas: list[tuple[str, str]] | None = None) -> int:
     """0 = pode subir; 1 = PUSH CANCELADO (sem perguntar). Se o próprio verificador falhar,
-    também cancela (falha fechada) — portão que falha aberto é silêncio disfarçado."""
+    também cancela (falha fechada) — portão que falha aberto é silêncio disfarçado. `faixas`
+    (só no hook): push que só mexe na Checklist de Bipagem passa direto (opção B)."""
+    if faixas and commits_so_da_checklist(repo_root, faixas):
+        imprimir("Portão de push: só a Checklist de Bipagem mudou — liberado sem checar os alertas do congelamento.")
+        return 0
     try:
         criticos = criticos_pendentes(repo_root, bases_dir, mb51)
     except Exception as e:  # noqa: BLE001
@@ -401,7 +465,8 @@ def main() -> None:
     p.add_argument("--gate", action="store_true", help="portão de push: sai com 1 (cancela) se houver alerta crítico")
     args = p.parse_args()
     if args.gate:
-        raise SystemExit(portao_de_push(bases_dir=args.bases_dir))
+        faixas = _faixas_do_stdin(sys.stdin.read()) if not sys.stdin.isatty() else []
+        raise SystemExit(portao_de_push(bases_dir=args.bases_dir, faixas=faixas))
     agora = datetime.datetime.now()
     alertas = verificar(bases_dir=args.bases_dir, agora=agora, ler_mb51=not args.rapido)
     imprimir(formatar_banner(alertas))

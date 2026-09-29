@@ -23,30 +23,25 @@ def test_prazo_de_sexta_e_o_proximo_dia_util_as_11h():
 
 # ---- 1. sequência ------------------------------------------------------------------
 
-def test_dia_pulado_so_vira_alerta_depois_do_prazo():
+def test_dia_atrasado_so_vira_aviso_depois_do_prazo():
     esperadas = {D(2026, 9, 16), D(2026, 9, 17)}
     congelados = {"2026-09-16"}
     assert saude.checar_sequencia(esperadas, congelados, DT(2026, 9, 18, 8, 0)) == []  # 17 ainda no prazo
     alertas = saude.checar_sequencia(esperadas, congelados, DT(2026, 9, 18, 11, 30))
-    assert _codigos(alertas) == ["dia_pulado"] and "17/09" in alertas[0]["titulo"]
+    assert _codigos(alertas) == ["dia_atrasado"] and "17/09" in alertas[0]["titulo"]
 
 
-def test_dia_pulado_no_meio_do_historico_continua_critico_dias_depois():
+def test_dia_pendente_nao_e_mais_critico_o_cabecalho_congela_todos_de_uma_vez():
+    """Desde 2026-09-27 sexta + sábado na mesma extração são congelados juntos: atraso só avisa,
+    nunca bloqueia o congelamento nem o push."""
+    alertas = saude.checar_sequencia({D(2026, 9, 25), D(2026, 9, 26)}, {"2026-09-24"}, DT(2026, 9, 29, 12, 0))
+    assert _codigos(alertas) == ["dia_atrasado"] and alertas[0]["nivel"] == "aviso"
+    assert "25/09" in alertas[0]["titulo"] and "26/09" in alertas[0]["titulo"]
+
+
+def test_buraco_antes_do_ultimo_congelado_vira_aviso_de_dia_pulado():
     alertas = saude.checar_sequencia({D(2026, 8, 31), D(2026, 9, 1)}, {"2026-09-01"}, DT(2026, 9, 18, 8, 0))
-    assert alertas[0]["nivel"] == "critico" and "31/08" in alertas[0]["titulo"]
-
-
-def test_ao_congelar_conta_como_pulado_tudo_antes_da_data_sem_prazo():
-    esperadas = {D(2026, 9, 16), D(2026, 9, 17)}
-    alertas = saude.checar_sequencia(esperadas, {"2026-09-15"}, DT(2026, 9, 18, 7, 0), hoje_a_congelar=D(2026, 9, 17))
-    assert _codigos(alertas) == ["dia_pulado"] and "16/09" in alertas[0]["titulo"]
-
-
-def test_congelar_dia_anterior_a_um_ja_congelado_e_fora_de_sequencia():
-    alertas = saude.checar_sequencia(
-        {D(2026, 9, 17)}, {"2026-09-17", "2026-09-18"}, DT(2026, 9, 18, 10, 0), hoje_a_congelar=D(2026, 9, 17)
-    )
-    assert "fora_de_sequencia" in _codigos(alertas)
+    assert _codigos(alertas) == ["dia_pulado"] and alertas[0]["nivel"] == "aviso" and "31/08" in alertas[0]["titulo"]
 
 
 def test_dia_anterior_ao_inicio_do_historico_nao_conta():
@@ -258,3 +253,60 @@ def test_dados_reconstruidos_so_avisa_dos_dias_ainda_nao_conferidos():
     assert "1 dia(s)" in alertas[0]["titulo"] and "04/09" in alertas[0]["titulo"] and "31/08" not in alertas[0]["titulo"]
     registro["2026-09-04"]["conferido_em"] = "2026-09-24"
     assert saude.checar_dados_reconstruidos(registro) == []
+
+
+# ---- exceção do portão: commit só da Checklist de Bipagem (opção B) -----------------------
+
+def _sha(w):
+    return subprocess.run(["git", "rev-parse", "HEAD"], cwd=w, check=True, capture_output=True, text=True).stdout.strip()
+
+
+def _repo_com_index(tmp_path):
+    w = tmp_path / "w"
+    w.mkdir()
+    _git(w, "init", "-b", "main")
+    _git(w, "config", "user.email", "t@t")
+    _git(w, "config", "user.name", "t")
+    (w / "index.html").write_text("<p>x</p>\nconst CHECKLIST_BIPAGEM = {\"rows\":[1]};\nconst HISTORICO_MB51 = {};\n", newline="\n")
+    (w / "checklist_bipagem.json").write_text("{}", newline="\n")
+    _git(w, "add", "-A")
+    _git(w, "commit", "-m", "base")
+    base = _sha(w)
+    return w, base
+
+
+def _commit(w, arquivo, conteudo):
+    (w / arquivo).write_text(conteudo, newline="\n")
+    _git(w, "add", arquivo)
+    _git(w, "commit", "-m", "c")
+    return _sha(w)
+
+
+def test_push_so_da_checklist_passa_o_portao_mesmo_com_alerta_critico(tmp_path, monkeypatch, capsys):
+    w, base = _repo_com_index(tmp_path)
+    _commit(w, "checklist_bipagem.json", '{"divergencias": []}')
+    topo = _commit(w, "index.html", "<p>x</p>\nconst CHECKLIST_BIPAGEM = {\"rows\":[]};\nconst HISTORICO_MB51 = {};\n")
+    monkeypatch.setattr(saude, "verificar", _fake_verificar([saude._alerta("x", "critico", "CRIT")]))
+    assert saude.portao_de_push(str(w), faixas=[(base, topo)]) == 0
+    assert "só a Checklist de Bipagem" in capsys.readouterr().out
+
+
+def test_push_que_mexe_em_outra_linha_do_index_continua_barrado(tmp_path, monkeypatch):
+    w, base = _repo_com_index(tmp_path)
+    topo = _commit(w, "index.html", "<p>x</p>\nconst CHECKLIST_BIPAGEM = {\"rows\":[]};\nconst HISTORICO_MB51 = {\"a\":1};\n")
+    monkeypatch.setattr(saude, "verificar", _fake_verificar([saude._alerta("x", "critico", "CRIT")]))
+    assert saude.commits_so_da_checklist(str(w), [(base, topo)]) is False
+    assert saude.portao_de_push(str(w), faixas=[(base, topo)]) == 1
+
+
+def test_push_com_outro_arquivo_ou_ref_nova_nao_e_so_da_checklist(tmp_path):
+    w, base = _repo_com_index(tmp_path)
+    topo = _commit(w, "historico_mb51.json", "{}")
+    assert saude.commits_so_da_checklist(str(w), [(base, topo)]) is False
+    assert saude.commits_so_da_checklist(str(w), [(saude.SHA_VAZIO, topo)]) is False
+    assert saude.commits_so_da_checklist(str(w), []) is False
+
+
+def test_faixas_do_stdin_do_hook():
+    linha = "refs/heads/main aaa refs/heads/main bbb\n"
+    assert saude._faixas_do_stdin(linha) == [("bbb", "aaa")]

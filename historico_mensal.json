@@ -32,8 +32,8 @@
     "notas_recebidas_mes": 155,
     "valor_recebido_mes": 1196134.79,
     "inventario_rotativo_mes": 1304,
-    "estornos_qtd_mes": 43,
-    "estornos_valor_mes": 35116.74
+    "estornos_qtd_mes": 44,
+    "estornos_valor_mes": 63552.48
   },
   "2026-05": {
     "linhas_atendidas_mes": 1915,
@@ -137,11 +137,11 @@
         "qtd": 51
       }
     ],
-    "notas_recebidas_mes": 194,
+    "notas_recebidas_mes": 193,
     "valor_recebido_mes": 1110804.63,
     "inventario_rotativo_mes": 1334,
-    "estornos_qtd_mes": 14,
-    "estornos_valor_mes": 340659.22
+    "estornos_qtd_mes": 18,
+    "estornos_valor_mes": 359763.21
   },
   "2026-08": {
     "linhas_atendidas_mes": 1202,
@@ -176,15 +176,15 @@
     "notas_recebidas_mes": 155,
     "valor_recebido_mes": 1160669.29,
     "inventario_rotativo_mes": 1212,
-    "estornos_qtd_mes": 46,
-    "estornos_valor_mes": 260272.79
+    "estornos_qtd_mes": 50,
+    "estornos_valor_mes": 279464.57
   },
   "2026-09": {
-    "linhas_atendidas_mes": 948,
-    "valor_atendido_mes": -1905200.45,
+    "linhas_atendidas_mes": 947,
+    "valor_atendido_mes": -1896708.69,
     "reservas_mes": 491,
     "ordens_mes": 262,
-    "intercompany_mes": 173,
+    "intercompany_mes": 172,
     "transferencias_mes": 18,
     "diversos_mes": 4,
     "top5_centro_custo": [
@@ -209,10 +209,10 @@
         "qtd": 38
       }
     ],
-    "notas_recebidas_mes": 186,
-    "valor_recebido_mes": 1663463.39,
-    "inventario_rotativo_mes": 1061,
-    "estornos_qtd_mes": 85,
-    "estornos_valor_mes": 433303.3
+    "notas_recebidas_mes": 183,
+    "valor_recebido_mes": 1631480.01,
+    "inventario_rotativo_mes": 1058,
+    "estornos_qtd_mes": 87,
+    "estornos_valor_mes": 468837.41
   }
 }

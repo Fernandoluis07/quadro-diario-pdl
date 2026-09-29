@@ -38,12 +38,29 @@ def estornos(df_mb51: pd.DataFrame, deposito: str, data_ref: datetime.date) -> i
     return len(df)
 
 
+def referencias_recebidas(df: pd.DataFrame) -> set:
+    """Notas (Referência) recebidas em `df` (um dia ou um mês, já no depósito certo): linhas
+    101/835, TIRANDO a nota cujo recebimento foi estornado por inteiro (102) dentro do mesmo
+    recorte — quantidade líquida 101/835 + 102 <= 0. Caso real: 55216-1, 101 e 102 de 16 un em
+    04/09 contava como recebida (168 notas em vez de 167, Fernando 2026-09-28). Estorno PARCIAL
+    não tira a nota: ela foi recebida."""
+    rec = df.loc[df["_bwart_norm"].isin(config.BWART_RECEBIMENTO)]
+    refs = set(rec["Referência"].dropna())
+    est = df.loc[df["_bwart_norm"].isin(config.BWART_ESTORNO_RECEBIMENTO) & df["Referência"].isin(refs)]
+    if est.empty:
+        return refs
+    ambos = pd.concat([rec, est])
+    liquido = pd.to_numeric(ambos["Qtd.  UM registro"], errors="coerce").fillna(0).groupby(ambos["Referência"]).sum()
+    zeradas = set(liquido[liquido <= 0].index) & set(est["Referência"])
+    return refs - zeradas
+
+
 def recebimentos(df_mb51: pd.DataFrame, deposito: str, data_ref: datetime.date) -> int:
-    """Conta valores ÚNICOS de Referência (nota fiscal) — NÃO conta linha."""
+    """Conta valores ÚNICOS de Referência (nota fiscal) — NÃO conta linha. Nota estornada por
+    inteiro (102) no mesmo dia não conta (ver referencias_recebidas)."""
     df = _filtrar_dia(df_mb51, data_ref)
     df = _filtrar_deposito(df, deposito)
-    df = df.loc[df["_bwart_norm"].isin(config.BWART_RECEBIMENTO)]
-    return df["Referência"].nunique()
+    return len(referencias_recebidas(df))
 
 
 def inventario_rotativo(df_mb51: pd.DataFrame, deposito: str, data_ref: datetime.date) -> int:

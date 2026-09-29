@@ -86,3 +86,14 @@ def test_arquivo_mb51_aceita_caminho_direto_e_ignora_bases_dir(tmp_path):
         arquivo_mb51=str(caminho_arquivo),
     )
     assert resultado["2026-04-01"]["linhas_atendidas_d009"] == 1
+
+
+def test_detalhe_por_material_mostra_o_lancamento_retroativo():
+    """Aviso de retroativo (só avisa): 2 estornos 202 do 805252 lançados depois do congelamento de 01/09."""
+    import pandas as pd
+    from backend import historico
+    base = pd.DataFrame([{"Material": "805252", "_deposito_norm": "D009", "_bwart_norm": "201", "_data_norm": datetime.date(2026, 9, 1),
+                          "Referência": None, "Qtd.  UM registro": -1}])
+    depois = pd.concat([base, pd.DataFrame([{**base.iloc[0].to_dict(), "_bwart_norm": "202", "Qtd.  UM registro": 0}] * 2)])
+    antes, agora = historico.detalhe_dia(base, datetime.date(2026, 9, 1)), historico.detalhe_dia(depois, datetime.date(2026, 9, 1))
+    assert historico.diferencas_detalhe(antes, agora) == ["estornos_d009: 805252 0 -> 2"]

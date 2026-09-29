@@ -7,11 +7,11 @@ Ordem/Centro custo nenhum) — precisa voltar na linha crua da MB51:
 
 - Valor Total Atendido/Recebido/Estornado (R$) — soma de "Montante em MI", não existe nos JSONs
   diários (que só contam linha).
-- Ordens x Reservas (+ "Outros" = nem Ordem nem Centro custo preenchidos) e Top 5 Centro de
-  Custo — dependem das colunas "Ordem"/"Centro custo", que os agregados diários nunca leram.
-  "Outros" é dinâmico por natureza (testa ausência dos 2 campos em cima de df_atend, o mesmo
-  conjunto de linhas de Reservas/Ordens) — cobre qualquer BWART de atendimento, inclusive um
-  tipo novo que apareça no futuro, sem precisar de lista fixa.
+- Atendimento em 5 grupos por tipo de movimento (Reservas 201, Ordens 261, Intercompany 601,
+  Transferências 833, Diversos = o resto, ver quebra_atendimento) — até 2026-09-27 eram 3
+  (Reservas = Centro custo preenchido, Ordens = Ordem preenchida, Outros = nenhum dos dois); na
+  MB51 inteira isso dava exatamente 201 e 261, então Reservas/Ordens não mudaram de número.
+- Top 5 Centro de Custo — depende da coluna "Centro custo", que os agregados diários nunca leram.
 - Notas Recebidas — dedup de Referência no MÊS INTEIRO (não é a soma de dedups diários, que
   daria um número diferente se a mesma nota aparecesse em mais de um dia).
 
@@ -51,6 +51,24 @@ def _soma_valor(df: pd.DataFrame) -> float:
     return round(float(pd.to_numeric(df["Montante em MI"], errors="coerce").fillna(0).sum()), 2)
 
 
+def quebra_atendimento(df_atend: pd.DataFrame) -> dict[str, int]:
+    """Linhas de atendimento do mês em 5 grupos por tipo de movimento (ver config.BWART_RESUMO_*).
+    Diversos é por exclusão, então os 5 sempre somam len(df_atend). Atendimento estornado NÃO é
+    descontado — saiu, é atendimento; o estorno conta à parte, no card de Estorno."""
+    bwart = df_atend["_bwart_norm"]
+    reservas = int(bwart.isin(config.BWART_RESUMO_RESERVAS).sum())
+    ordens = int(bwart.isin(config.BWART_RESUMO_ORDENS).sum())
+    intercompany = int(bwart.isin(config.BWART_RESUMO_INTERCOMPANY).sum())
+    transferencias = int(bwart.isin(config.BWART_RESUMO_TRANSFERENCIAS).sum())
+    return {
+        "reservas_mes": reservas,
+        "ordens_mes": ordens,
+        "intercompany_mes": intercompany,
+        "transferencias_mes": transferencias,
+        "diversos_mes": len(df_atend) - reservas - ordens - intercompany - transferencias,
+    }
+
+
 def _ultimo_dia_do_mes(ano: int, mes: int) -> datetime.date:
     if mes == 12:
         return datetime.date(ano, 12, 31)
@@ -80,9 +98,7 @@ def _calcular_mes(
 
     # ---- Bloco 1: Atendimento ----
     df_atend = df_mes.loc[df_mes["_bwart_norm"].isin(config.BWART_ATENDIMENTO)]
-    reservas_mes = int(_preenchido(df_atend["Centro custo"]).sum())
-    ordens_mes = int(_preenchido(df_atend["Ordem"]).sum())
-    outros_mes = int((~_preenchido(df_atend["Centro custo"]) & ~_preenchido(df_atend["Ordem"])).sum())
+    grupos = quebra_atendimento(df_atend)
     centro_preenchido = df_atend.loc[_preenchido(df_atend["Centro custo"]), "Centro custo"].astype(str).str.strip()
     top5_centro_custo = [
         {"centro_custo": centro, "qtd": int(qtd)} for centro, qtd in centro_preenchido.value_counts().head(5).items()
@@ -104,15 +120,15 @@ def _calcular_mes(
     return {
         "linhas_atendidas_mes": len(df_atend),
         "valor_atendido_mes": _soma_valor(df_atend),
-        "reservas_mes": reservas_mes,
-        "ordens_mes": ordens_mes,
-        "outros_mes": outros_mes,
+        **grupos,
         "top5_centro_custo": top5_centro_custo,
-        "notas_recebidas_mes": int(df_receb["Referência"].nunique()),
+        "notas_recebidas_mes": len(indicadores.referencias_recebidas(df_mes)),
         "valor_recebido_mes": _soma_valor(df_receb),
         "inventario_rotativo_mes": inventario_rotativo_mes,
         "estornos_qtd_mes": len(df_estorno),
-        "estornos_valor_mes": _soma_valor(df_estorno),
+        # valor ABSOLUTO: 202/222/262/602/834/123 vêm positivos e o 102 (estorno de recebimento,
+        # 2026-09-28) vem sempre negativo — somar com sinal fazia um descontar o outro
+        "estornos_valor_mes": round(float(pd.to_numeric(df_estorno["Montante em MI"], errors="coerce").fillna(0).abs().sum()), 2),
     }
 
 

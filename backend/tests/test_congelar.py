@@ -461,3 +461,24 @@ def test_remover_dia_recusa_dia_do_meio_e_dia_inexistente_sem_alterar_nada(tmp_p
     assert (tmp_path / "index.html").read_text(encoding="utf-8") == antes
     assert "2026-09-18" in (tmp_path / "historico_mb51.json").read_text()
 
+
+
+def test_congelar_fim_de_semana_grava_so_os_8_da_mb51(tmp_path):
+    repo_root, index_path = _preparar_repo(tmp_path)
+    entrada = {c: 1 for c in congelar.CAMPOS_MB51} | {"intercompany": 9}
+    resultado = congelar.congelar_fim_de_semana(
+        repo_root=repo_root, index_path=index_path, data_ref=datetime.date(2026, 8, 15),
+        entrada_mb51=entrada,
+    )
+    h = json.loads((tmp_path / "historico_mb51.json").read_text(encoding="utf-8"))
+    assert h["2026-08-15"] == {c: 1 for c in congelar.CAMPOS_MB51}  # sem intercompany (card 19 é manual)
+    assert "2026-08-15" not in json.loads((tmp_path / "historico_manuais.json").read_text(encoding="utf-8"))
+    assert "2026-08-15" not in json.loads((tmp_path / "historico_zmm028.json").read_text(encoding="utf-8"))
+    html = (tmp_path / "index.html").read_text(encoding="utf-8")
+    assert '"2026-08-15":{"linhas_atendidas_d009":1' in html
+    # Resumo do Mês NÃO muda no fim de semana: copia a sexta (Fernando 2026-09-28)
+    assert json.loads((tmp_path / "historico_mensal.json").read_text(encoding="utf-8")) == {"2026-08": {"linhas_atendidas_mes": 10}}
+    assert [os.path.basename(a) for a in resultado["arquivos_json_atualizados"]] == ["historico_mb51.json"]
+    with pytest.raises(congelar.DiaJaCongeladoError):
+        congelar.congelar_fim_de_semana(repo_root=repo_root, index_path=index_path, data_ref=datetime.date(2026, 8, 15),
+                                        entrada_mb51=entrada)

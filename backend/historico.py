@@ -40,6 +40,39 @@ def _calcular_dia(df_mb51, data: datetime.date) -> dict:
     }
 
 
+ARQUIVO_DETALHE = "historico_mb51_detalhe.json"
+
+
+def detalhe_dia(df_mb51, data: datetime.date) -> dict:
+    """Composição dos 8 indicadores da MB51 do dia, POR MATERIAL (recebimentos: por nota), como
+    estava no congelamento: {campo: {material_ou_nota: quantidade}}. Existe só pra, quando a MB51
+    mudar depois (lançamento retroativo), o aviso do Cabeçalho dizer QUAL material mudou, com o
+    valor antigo e o novo (Fernando 2026-09-28: só avisa, nunca corrige sozinho)."""
+    dia = indicadores._filtrar_dia(df_mb51, data)
+    mat = indicadores._normalizar_material(dia["Material"])
+    out = {}
+    for dep in (config.DEPOSITO_D009, config.DEPOSITO_D016):
+        noDep = dia["_deposito_norm"] == dep
+        sufixo = dep.lower()
+        for campo, bwarts in (("linhas_atendidas", config.BWART_ATENDIMENTO), ("estornos", config.BWART_ESTORNO)):
+            sel = noDep & dia["_bwart_norm"].isin(bwarts)
+            out[f"{campo}_{sufixo}"] = {k: int(v) for k, v in mat[sel].value_counts().items()}
+        out[f"recebimentos_{sufixo}"] = {str(r): 1 for r in indicadores.referencias_recebidas(dia.loc[noDep])}
+        out[f"inventario_rotativo_{sufixo}"] = {k: 1 for k in mat[noDep].unique()}
+    return out
+
+
+def diferencas_detalhe(antes: dict, agora: dict) -> list[str]:
+    """'estornos_d009: 805252 0 -> 2' pra cada material/nota que mudou entre dois detalhe_dia."""
+    linhas = []
+    for campo in sorted(set(antes) | set(agora)):
+        a, b = antes.get(campo, {}), agora.get(campo, {})
+        for chave in sorted(set(a) | set(b)):
+            if a.get(chave, 0) != b.get(chave, 0):
+                linhas.append(f"{campo}: {chave} {a.get(chave, 0)} -> {b.get(chave, 0)}")
+    return linhas
+
+
 def calcular_historico_mb51(
     data_inicio: datetime.date,
     data_fim: datetime.date | None = None,

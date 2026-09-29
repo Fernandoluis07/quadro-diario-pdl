@@ -17,11 +17,20 @@ Fluxo, com confirmação em cada etapa importante:
      planilha_manual_quadro_diario.xlsx da pasta "03. Bases" (ou --bases-dir/--manual),
      e a MM60.xlsx (preço de referência, atualizada esporadicamente — não faz parte
      do ciclo diário) da pasta fixa "Bases" dentro do próprio repositório.
-  3. Calcula os 20 indicadores + Resumo do Mês, reaproveitando main.py/indicadores.py/
+  3. Descobre os dias a congelar: TODOS os dias com movimento na MB51 depois do último
+     congelado (planejar_dias — 2026-09-27, substituiu a trava de dia pulado: sexta e
+     sábado que chegam na mesma extração são os dois processados, nenhum é pulado). Dia
+     útil = completo; sábado/domingo/feriado com movimento = só os 8 indicadores da MB51
+     (sem movimento em D009/D016 nem entra, e o Calendário o bloqueia). Dia útil seguido de
+     outros dias na mesma extração tem os 4 indicadores de saldo reconstruídos desfazendo os
+     dias seguintes (config.INDICADORES_SALDO_RECONSTRUIDOS); MB25 fica a foto da extração.
+     Dia que ainda não acabou só entra digitando CONTINUAR.
+     Calcula os 20 indicadores + Resumo do Mês, reaproveitando main.py/indicadores.py/
      historico_mensal.py — não recalcula nada que já existe. NÃO mostra esses números
      na tela (removido por pedido — ninguém queria mais conferir o resumo antes de
      confirmar); só imprime um ALERTA, se houver, de material VB sem preço na MM60.
-  4. Pergunta "Posso congelar?".
+  4. Pergunta "Posso congelar?" (uma vez, listando os dias). Depois de congelar, roda a
+     Checklist de Bipagem (detecta nos dias fechados; falha dela nunca derruba o congelamento).
   5. Se sim, congela (backend/congelar.py) — um dia já congelado antes só é
      sobrescrito se o usuário pedir reprocessamento forçado E digitar a senha
      correta (config.SENHA_FORCAR_RECONGELAMENTO_SHA256); sem a senha certa,
@@ -50,7 +59,8 @@ import os
 import subprocess
 import sys
 
-from . import config, congelar, extratos, historico_mensal, planilha_manual, saude
+from . import checklist_bipagem, config, congelar, extratos, historico, historico_mensal, planilha_manual, reconstruir, saude
+from . import indicadores as indicadores_mod
 from .main import _parse_data, calcular_todos_indicadores
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -112,29 +122,21 @@ def _avisar_materiais_sem_preco_mm60(indicadores: dict) -> None:
 
 
 def _confirmar_continuar() -> bool:
-    return input("Digite CONTINUAR (em maiúsculas) para congelar mesmo assim: ").strip() == "CONTINUAR"
+    return input("Digite CONTINUAR (em maiúsculas) para congelar mesmo assim, ou Enter para deixar esse dia de fora: ").strip() == "CONTINUAR"
 
 
-def _alertar_saude(bases_dir, manual_path, hoje, df_mb51, historico_mb51, final: bool = False) -> list[dict]:
-    """Imprime o banner de alertas (nunca em log escondido), grava alertas_saude.js pro site
-    e devolve os alertas que BLOQUEIAM o congelamento de `hoje` (vazio se `final`). Falha
-    do próprio verificador é mostrada na tela — o alarme não pode falhar em silêncio."""
+def _alertar_saude(bases_dir, df_mb51) -> None:
+    """Imprime o banner de alertas (nunca em log escondido) e grava alertas_saude.js pro site.
+    Não bloqueia mais nada (2026-09-27): dia pulado deixou de existir (o Cabeçalho congela todos
+    os pendentes) e dia em aberto é tratado em executar(). Falha do próprio verificador é
+    mostrada na tela — o alarme não pode falhar em silêncio."""
     agora = datetime.datetime.now()
     try:
-        bloqueios: list[dict] = []
-        if not final:
-            datas = {d for d in extratos.datas_disponiveis(df_mb51) if d is not None}
-            bloqueios = saude.checar_antes_de_congelar(hoje, df_mb51, historico_mb51, agora, datas) if historico_mb51 else \
-                saude.checar_dia_em_aberto(hoje, agora)
         gerais = saude.verificar(repo_root=REPO_ROOT, bases_dir=bases_dir, agora=agora, mb51=df_mb51)
-        codigos = {b["codigo"] for b in bloqueios}
-        todos = bloqueios + [a for a in gerais if a["codigo"] not in codigos]
-        saude.imprimir(saude.formatar_banner(todos))
+        saude.imprimir(saude.formatar_banner(gerais))
         saude.gravar_alertas_js(REPO_ROOT, gerais, agora)
-        return bloqueios
     except Exception as e:  # noqa: BLE001 — o verificador nunca pode derrubar o Cabeçalho, mas TEM que avisar
         saude.imprimir(f"!! NÃO CONSEGUI VERIFICAR A SAÚDE DO SISTEMA ({type(e).__name__}: {e}) — avise quem mantém o projeto.")
-        return []
 
 
 def _git(repo_root: str, *args: str) -> subprocess.CompletedProcess:
@@ -208,7 +210,7 @@ def sincronizar_com_remoto(repo_root: str) -> str | None:
     return None
 
 
-def subir_para_github(repo_root: str, data_iso: str, arquivos: list[str]) -> None:
+def subir_para_github(repo_root: str, data_iso: str | None, arquivos: list[str], mensagem: str | None = None) -> None:
     """`arquivos` tem que ser exatamente os caminhos que congelar_dia() escreveu
     (resultado["arquivos_json_atualizados"] + [resultado["index_html_atualizado"]]) —
     NUNCA "git add -A". Este repositório é uma pasta de rede compartilhada por várias
@@ -237,7 +239,7 @@ def subir_para_github(repo_root: str, data_iso: str, arquivos: list[str]) -> Non
         return
 
     if ha_mudancas:
-        r_commit = _git(repo_root, "commit", "-m", f"Congela dia {data_iso}", "--", *arquivos)
+        r_commit = _git(repo_root, "commit", "-m", mensagem or f"Congela dia {data_iso}", "--", *arquivos)
         if r_commit.returncode != 0:
             raise RuntimeError(f"git commit falhou:\n{r_commit.stderr}")
         print(r_commit.stdout.strip())
@@ -246,6 +248,98 @@ def subir_para_github(repo_root: str, data_iso: str, arquivos: list[str]) -> Non
     if r_push.returncode != 0:
         raise RuntimeError(f"git push falhou:\n{r_push.stderr}")
     print("Push concluído.")
+
+
+class PlanoError(Exception):
+    """A extração não permite saber com segurança quais dias congelar — nada é gravado."""
+
+
+def planejar_dias(datas_mb51: set, congelados: set[str]) -> list[datetime.date]:
+    """Todos os dias com movimento na MB51 DEPOIS do último dia congelado, em ordem (2026-09-27:
+    substitui a trava de dia pulado — sexta e sábado que chegam na mesma extração são os dois
+    processados). Sem nenhum dia congelado ainda (repositório novo), só o último da MB51.
+
+    A MB51 tem que incluir o último dia já congelado: extraída com período curto, um dia útil
+    sem nenhuma linha seria congelado como zero, em silêncio."""
+    datas = sorted(d for d in datas_mb51 if d is not None)
+    if not datas:
+        raise PlanoError("A MB51 não tem nenhuma data válida em 'Data de lançamento'.")
+    if not congelados:
+        return [datas[-1]]
+    ultimo = max(datetime.date.fromisoformat(c) for c in congelados)
+    if datas[0] > ultimo:
+        raise PlanoError(
+            f"A MB51 começa em {datas[0]:%d/%m/%Y}, depois do último dia congelado ({ultimo:%d/%m/%Y}) — "
+            "pode estar faltando dia no meio. Extraia a MB51 com um período que inclua o último dia congelado."
+        )
+    return [d for d in datas if d > ultimo]
+
+
+def _descrever_dia(d: datetime.date) -> str:
+    nome = ("segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo")[d.weekday()]
+    tipo = "completo" if saude.eh_dia_util(d) else "só os 8 indicadores da MB51"
+    return f"{d:%d/%m/%Y} ({nome}, {tipo})"
+
+
+def _reconstruir_saldos(indicadores: dict, zmm028_d009, df_mb51, mm60, dia: datetime.date, ultima: datetime.date) -> list[str]:
+    """Dia útil numa extração que já traz dias posteriores (sexta + sábado): os 4 indicadores de
+    saldo (config.INDICADORES_SALDO_RECONSTRUIDOS) saem da ZMM028 com os movimentos posteriores
+    DESFEITOS, em vez da foto tirada depois do sábado. Devolve os campos trocados ([] = nada a
+    desfazer). MB25 e o resto continuam sendo a foto da extração (decisão 2026-09-27)."""
+    d009 = df_mb51.loc[df_mb51["_deposito_norm"] == config.DEPOSITO_D009, "_data_norm"]
+    if not d009.map(lambda d: d is not None and d > dia).any():
+        return []
+    z = reconstruir.zmm028_no_fim_do_dia(zmm028_d009, df_mb51, dia, ultima, mm60)
+    calculos = {
+        "itens_estoque_com_saldo": indicadores_mod.itens_estoque_com_saldo,
+        "valor_estoque_total": indicadores_mod.valor_estoque_total,
+        "itens_mrp_saldo_zero": indicadores_mod.itens_mrp_saldo_zero,
+        "itens_sem_endereco": indicadores_mod.itens_sem_endereco,
+    }
+    for campo in config.INDICADORES_SALDO_RECONSTRUIDOS:
+        indicadores[campo] = calculos[campo](z)
+    return list(config.INDICADORES_SALDO_RECONSTRUIDOS)
+
+
+def _registrar_reconstrucao(repo_root: str, reconstruidos: dict[str, list[str]], ultima: datetime.date, agora: datetime.datetime) -> str | None:
+    if not reconstruidos:
+        return None
+    caminho = os.path.join(repo_root, "dias_reconstruidos.json")
+    registro = congelar._carregar_json(caminho)
+    for iso, campos in reconstruidos.items():
+        registro[iso] = {
+            "metodo": "só os indicadores de saldo: ZMM028 da extração com os movimentos da MB51 posteriores ao dia desfeitos "
+                      "(dia útil congelado junto com o fim de semana)",
+            "snapshot": ultima.isoformat(),
+            "gerado_em": agora.isoformat(timespec="seconds"),
+            "campos_reconstruidos": campos,
+            "parcial": True,
+        }
+    congelar._salvar_json(caminho, registro)
+    return caminho
+
+
+def _rodar_checklist(df_mb51, bases_dir: str, index_path: str, agora: datetime.datetime) -> list[str]:
+    """Checklist de Bipagem dentro do Cabeçalho: DETECTA nos dias fechados ainda não auditados e
+    reavalia as abertas. Qualquer falha é mostrada na tela e NÃO derruba o congelamento — a
+    Checklist fica pendente (o último dia auditado não anda) e entra na próxima execução."""
+    try:
+        extracao = datetime.datetime.fromtimestamp(os.path.getmtime(os.path.join(bases_dir, config.MB51_FILENAME)))
+        sp, cad = checklist_bipagem.ler_bases_bipagem(extracao)
+        zmm = extratos.carregar_zmm028(os.path.join(bases_dir, config.ZMM028_FILENAME))
+        data_extracao = extracao.date()
+        estado = checklist_bipagem.carregar_estado(REPO_ROOT)
+        estado, res = checklist_bipagem.auditar(estado, df_mb51, zmm, sp, cad, data_extracao, agora)
+        estado, corrigidas = checklist_bipagem.reavaliar(estado, sp, cad, agora)
+        arquivos = checklist_bipagem.gravar(REPO_ROOT, index_path, estado, agora)
+    except Exception as e:  # noqa: BLE001 — a Checklist nunca derruba o congelamento, mas TEM que avisar
+        saude.imprimir(f"\n!! CHECKLIST DE BIPAGEM NÃO FOI ATUALIZADA ({type(e).__name__}: {e}).\n"
+                       "   Os dias continuam pendentes e entram na próxima execução.")
+        return []
+    auditados = ", ".join(f"{d:%d/%m}" for d in res["dias_auditados"]) or "nenhum dia novo fechado"
+    print(f"\nChecklist de Bipagem: auditado(s) {auditados}; {len(res['novas'])} divergência(s) nova(s), "
+          f"{len(corrigidas)} corrigida(s). {checklist_bipagem.resumo_texto(estado)}.")
+    return arquivos
 
 
 def executar(
@@ -276,80 +370,157 @@ def executar(
 
     print("Lendo planilhas e calculando os indicadores...")
     # MB51 (a maior das 3 planilhas do dia, ~40s pra ler sobre a rede) é carregada UMA
-    # VEZ aqui e reaproveitada tanto pros indicadores do dia quanto pro Resumo do Mês
-    # (historico_mensal) logo abaixo — antes disso, os dois liam o mesmo arquivo do
-    # zero cada um, dobrando à toa o tempo da etapa mais pesada do Cabeçalho.
+    # VEZ aqui e reaproveitada pra todos os dias, pro Resumo do Mês e pra Checklist.
     df_mb51 = extratos.carregar_mb51(os.path.join(bases_dir, config.MB51_FILENAME))
-    indicadores = calcular_todos_indicadores(bases_dir=bases_dir, data_ref=data_forcada, df_mb51=df_mb51)
-    hoje = datetime.date.fromisoformat(indicadores["data_referencia"])
-
     caminho_mb51_json = os.path.join(REPO_ROOT, "historico_mb51.json")
+    historico_mb51 = congelar._carregar_json(caminho_mb51_json)
+    datas_mb51 = {d for d in extratos.datas_disponiveis(df_mb51) if d is not None}
+    agora = datetime.datetime.now()
 
-    # Alertas de saúde (backend/saude.py) — ANTES de qualquer outra pergunta. Dia em aberto,
-    # dia pulado e dia fora de sequência BLOQUEIAM: só segue digitando CONTINUAR.
-    bloqueios = _alertar_saude(bases_dir, manual_path, hoje, df_mb51, congelar._carregar_json(caminho_mb51_json))
-    if bloqueios and not _confirmar_continuar():
-        print("Ok, nada foi alterado.")
-        return 1
+    # Alertas de saúde (backend/saude.py) — banner ANTES de qualquer pergunta.
+    _alertar_saude(bases_dir, df_mb51)
 
-    # Checa "já congelado?"/senha ANTES de mostrar qualquer resumo: uma senha errada
-    # tem que travar a execução imediatamente, sem imprimir nada que pareça sucesso
-    # (ver backend/cabecalho.py — bug diagnosticado 2026-08-12/13, resumo era
-    # mostrado antes da senha e por isso parecia ter funcionado mesmo quando não
-    # gravava nada).
+    # Dias a congelar: todos os pendentes (ou só o --data). Dia já congelado só com senha —
+    # checado ANTES de qualquer resumo (bug de 2026-08-12/13: resumo antes da senha parecia
+    # sucesso mesmo quando nada era gravado).
     forcar = False
-    if congelar.ja_congelado(congelar._carregar_json(caminho_mb51_json), hoje.isoformat()):
-        print(f"O dia {hoje:%d/%m/%Y} já tinha sido congelado antes.")
+    if data_forcada is not None:
+        dias = [data_forcada]
+    else:
+        try:
+            dias = planejar_dias(datas_mb51, set(historico_mb51))
+        except PlanoError as e:
+            print(f"ERRO — {e}\nNada foi alterado.")
+            return 1
+    if not dias or congelar.ja_congelado(historico_mb51, dias[-1].isoformat()):
+        dia = dias[-1] if dias else max(datas_mb51)
+        print(f"O dia {dia:%d/%m/%Y} já tinha sido congelado antes (nenhum dia pendente na MB51).")
         if not _confirmar("Quer forçar o reprocessamento mesmo assim?"):
             print("Ok, nada foi alterado.")
             return 0
         if not _senha_forcar_correta():
             print("Senha incorreta — o dia continua bloqueado, nada foi alterado.")
             return 0
-        forcar = True
+        dias, forcar = [dia], True
 
+    # Dia que ainda não acabou: só entra digitando CONTINUAR (congelamento à noite, fim de
+    # turno); sem isso, os dias anteriores seguem e ele fica pra próxima execução.
+    em_aberto = [d for d in dias if d >= agora.date()]
+    if em_aberto:
+        saude.imprimir(saude.formatar_banner(saude.checar_dia_em_aberto(em_aberto[0], agora)))
+        if not _confirmar_continuar():
+            dias = [d for d in dias if d < agora.date()]
+            if not dias:
+                print("Ok, nada foi alterado.")
+                return 1
+            print(f"Ok — congelo só os dias anteriores, sem o {em_aberto[0]:%d/%m}.")
+
+    uteis = [d for d in dias if saude.eh_dia_util(d)]
     manuais_planilha = planilha_manual.ler_indicadores_diarios(manual_path)
-    manual_hoje = manuais_planilha.get(hoje.isoformat())
-    if manual_hoje is None:
+    sem_manual = [d for d in uteis if d.isoformat() not in manuais_planilha]
+    if sem_manual:
         print(
-            f"\nERRO: a planilha manual não tem uma linha preenchida para {hoje:%d/%m/%Y} "
+            f"\nERRO: a planilha manual não tem uma linha preenchida para {', '.join(f'{d:%d/%m/%Y}' for d in sem_manual)} "
             "(aba 'Indicadores Diarios') — preencha antes de continuar. Nada foi alterado."
         )
         return 1
 
+    ultima_mb51 = max(datas_mb51)
+    zmm028_d009 = mm60 = None
+    por_dia: dict[datetime.date, dict] = {}
+    reconstruidos: dict[str, list[str]] = {}
+    ignorados: list[datetime.date] = []
+    for d in dias:
+        if d in uteis:
+            ind = calcular_todos_indicadores(bases_dir=bases_dir, data_ref=d, df_mb51=df_mb51)
+            if d < ultima_mb51:
+                if zmm028_d009 is None:
+                    zmm028_d009 = extratos.carregar_zmm028(os.path.join(bases_dir, config.ZMM028_FILENAME))
+                    mm60 = extratos.carregar_mm60(os.path.join(config.MM60_DIR, config.MM60_FILENAME))
+                campos = _reconstruir_saldos(ind, zmm028_d009, df_mb51, mm60, d, ultima_mb51)
+                if campos:
+                    reconstruidos[d.isoformat()] = campos
+            por_dia[d] = ind
+        else:
+            entrada = historico._calcular_dia(df_mb51, d)
+            if not any(entrada[c] for c in congelar.CAMPOS_MB51):
+                ignorados.append(d)  # sem movimento em D009/D016: fica bloqueado no Calendário
+                continue
+            por_dia[d] = entrada
+    dias = [d for d in dias if d in por_dia]
+    if not dias:
+        print("Nenhum dia com movimento em D009/D016 para congelar. Nada foi alterado.")
+        return 0
+
     pontos_avisos = planilha_manual.ler_pontos_avisos(manual_path)
     datas_importantes = planilha_manual.ler_datas_importantes(manual_path)
+    # Resumo do Mês fecha no último DIA ÚTIL do lote: sábado/domingo copiam a sexta em tudo que
+    # não é os 8 da MB51 nem a Checklist (Fernando 2026-09-28). O movimento do fim de semana
+    # entra no mês quando a segunda for congelada. Lote só de fim de semana: o mês não muda.
+    uteis_no_lote = [d for d in dias if d in uteis]
+    resumo_mes = (
+        historico_mensal.calcular_historico_mensal(uteis_no_lote[0].replace(day=1), uteis_no_lote[-1], df_mb51=df_mb51)
+        if uteis_no_lote else None
+    )
 
-    inicio_mes = hoje.replace(day=1)
-    resumo_mes = historico_mensal.calcular_historico_mensal(inicio_mes, hoje, df_mb51=df_mb51)
+    for d in uteis:
+        if d in por_dia:
+            _avisar_materiais_sem_preco_mm60(por_dia[d])
+            break
 
-    _avisar_materiais_sem_preco_mm60(indicadores)
+    print("\nDias a congelar:")
+    for d in dias:
+        extra = " — saldo reconstruído desfazendo os dias seguintes" if d.isoformat() in reconstruidos else ""
+        print(f"  • {_descrever_dia(d)}{extra}")
+    for d in ignorados:
+        print(f"  • {d:%d/%m/%Y}: sem movimento em D009/D016 — fica bloqueado no Calendário")
 
     if not _confirmar("\nPosso congelar?"):
         print("Ok, nada foi alterado.")
         return 0
 
-    try:
-        resultado = congelar.congelar_dia(
-            repo_root=REPO_ROOT,
-            index_path=index_path,
-            data_ref=hoje,
-            indicadores=indicadores,
-            manual_hoje=manual_hoje,
-            pontos_atencao=pontos_avisos["pontos_atencao"],
-            avisos_importantes=pontos_avisos["avisos_importantes"],
-            datas_importantes=datas_importantes,
-            resumo_mes=resumo_mes,
-            forcar=forcar,
-        )
-    except congelar.DiaJaCongeladoError as e:
-        print(str(e))
-        return 0
+    arquivos: list[str] = []
+    for d in dias:
+        try:
+            if d in uteis:
+                resultado = congelar.congelar_dia(
+                    repo_root=REPO_ROOT,
+                    index_path=index_path,
+                    data_ref=d,
+                    indicadores=por_dia[d],
+                    manual_hoje=manuais_planilha[d.isoformat()],
+                    pontos_atencao=pontos_avisos["pontos_atencao"],
+                    avisos_importantes=pontos_avisos["avisos_importantes"],
+                    datas_importantes=datas_importantes,
+                    resumo_mes=resumo_mes,
+                    forcar=forcar,
+                )
+                if resultado["cards_nao_encontrados"]:
+                    print(f"ATENÇÃO — títulos de card não encontrados no index.html: {resultado['cards_nao_encontrados']}")
+            else:
+                resultado = congelar.congelar_fim_de_semana(
+                    repo_root=REPO_ROOT, index_path=index_path, data_ref=d,
+                    entrada_mb51=por_dia[d], forcar=forcar,
+                )
+        except congelar.DiaJaCongeladoError as e:
+            print(str(e))
+            return 0
+        print(f"Dia {d:%d/%m/%Y} congelado.")
+        arquivos += [a for a in resultado["arquivos_json_atualizados"] + [resultado["index_html_atualizado"]] if a not in arquivos]
 
-    print(f"\nDia {hoje:%d/%m/%Y} congelado com sucesso.")
-    print(f"Cards atualizados no index.html: {len(resultado['cards_atualizados'])}")
-    if resultado["cards_nao_encontrados"]:
-        print(f"ATENÇÃO — títulos de card não encontrados no index.html: {resultado['cards_nao_encontrados']}")
+    # composição por material dos 8 indicadores de cada dia congelado — base do aviso de
+    # lançamento retroativo (saude.checar_dias_fechados_incompletos), que só avisa, não corrige
+    caminho_detalhe = os.path.join(REPO_ROOT, historico.ARQUIVO_DETALHE)
+    detalhe = congelar._carregar_json(caminho_detalhe)
+    for d in dias:
+        detalhe[d.isoformat()] = historico.detalhe_dia(df_mb51, d)
+    congelar._salvar_json(caminho_detalhe, detalhe)
+    arquivos.append(caminho_detalhe)
+
+    registro = _registrar_reconstrucao(REPO_ROOT, reconstruidos, ultima_mb51, agora)
+    if registro:
+        arquivos.append(registro)
+    arquivos += [a for a in _rodar_checklist(df_mb51, bases_dir, index_path, agora) if a not in arquivos]
 
     if not _confirmar("\nPosso subir pro GitHub?"):
         print("Ok — as alterações ficaram salvas localmente. Suba manualmente quando quiser (git add/commit/push).")
@@ -361,15 +532,16 @@ def executar(
         print("As alterações ficaram salvas localmente. Resolva os alertas e rode o Cabeçalho de novo pra subir.")
         return 1
 
-    arquivos_congelados = resultado["arquivos_json_atualizados"] + [resultado["index_html_atualizado"]]
+    rotulo = " e ".join(d.isoformat() for d in dias)
     try:
-        subir_para_github(REPO_ROOT, hoje.isoformat(), arquivos_congelados)
+        subir_para_github(REPO_ROOT, rotulo, arquivos)
     except RuntimeError as e:
         print(f"ERRO ao subir pro GitHub:\n{e}")
         return 1
 
-    print(f"\n✅ Tudo certo! Dia {hoje:%d/%m/%Y} processado e publicado com sucesso.")
-    _alertar_saude(bases_dir, manual_path, None, df_mb51, None, final=True)
+    feitos = ", ".join(f"{d:%d/%m/%Y}" for d in dias)
+    print(f"\n✅ Tudo certo! {'Dias' if len(dias) > 1 else 'Dia'} {feitos} processado(s) e publicado(s) com sucesso.")
+    _alertar_saude(bases_dir, df_mb51)
     return 0
 
 

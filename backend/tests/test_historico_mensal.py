@@ -39,45 +39,47 @@ def test_soma_valor_e_conta_linha_sem_dedup_no_bloco_atendimento(tmp_path):
     assert mes["valor_atendido_mes"] == 30.0
 
 
-def test_ordens_e_reservas_contam_presenca_independente(tmp_path):
+def test_atendimento_em_5_grupos_por_tipo_de_movimento(tmp_path):
+    """Reservas 201, Ordens 261, Intercompany 601, Transferências 833, Diversos = o resto
+    (decisão 2026-09-27). Ordem/Centro custo NÃO decidem mais o grupo."""
     bases_dir = _preparar_mb51(
         tmp_path,
         [
             _linha("1001", "D009", 201, "01.04.2026", "NF-A", ordem="4001", centro_custo=None),
             _linha("1002", "D009", 201, "02.04.2026", "NF-B", ordem=None, centro_custo="2003CSC"),
-            _linha("1003", "D009", 201, "03.04.2026", "NF-C", ordem="4002", centro_custo="2003SEG"),
-            _linha("1004", "D009", 201, "04.04.2026", "NF-D", ordem=None, centro_custo=None),
+            _linha("1003", "D009", 261, "03.04.2026", "NF-C", ordem="4002", centro_custo="2003SEG"),
+            _linha("1004", "D009", 601, "04.04.2026", "NF-D"),
+            _linha("1005", "D009", 601, "04.04.2026", "NF-D"),
+            _linha("1006", "D009", 833, "05.04.2026", "NF-E"),
+            _linha("1007", "D009", 122, "06.04.2026", "NF-F"),
+            _linha("1008", "D009", 921, "06.04.2026", "NF-G", ordem="5001"),
         ],
     )
-    resultado = historico_mensal.calcular_historico_mensal(
+    mes = historico_mensal.calcular_historico_mensal(
         datetime.date(2026, 4, 1), datetime.date(2026, 4, 30), bases_dir=bases_dir
-    )
-    mes = resultado["2026-04"]
-    assert mes["ordens_mes"] == 2
-    assert mes["reservas_mes"] == 2
-    assert mes["outros_mes"] == 1  # "1004": nem ordem nem centro custo
-    # "1003" tem ordem E centro custo ao mesmo tempo (fixture propositalmente cobre esse caso) —
-    # conta nos 2, então a soma das 3 categorias aqui passa de linhas_atendidas_mes; ver teste
-    # dedicado abaixo (sem linha com os 2 campos) pra conferir a invariante de soma exata.
+    )["2026-04"]
+    assert (mes["reservas_mes"], mes["ordens_mes"], mes["intercompany_mes"],
+            mes["transferencias_mes"], mes["diversos_mes"]) == (2, 1, 2, 1, 2)
+    assert "outros_mes" not in mes
 
 
-def test_outros_mes_e_dinamico_nao_depende_de_bwart_especifico(tmp_path):
-    """'Outros' não é uma lista fixa de BWART (122/221/601/833) — é qualquer linha de
-    atendimento sem Ordem nem Centro custo, mesmo com um BWART comum como 921."""
+def test_os_5_grupos_somam_linhas_atendidas_e_estorno_nao_desconta(tmp_path):
+    """Atendimento estornado continua atendimento (o 602 só aparece no card de Estorno)."""
     bases_dir = _preparar_mb51(
         tmp_path,
         [
-            _linha("2001", "D009", 921, "01.04.2026", "NF-X", ordem=None, centro_custo=None),
-            _linha("2002", "D009", 921, "02.04.2026", "NF-Y", ordem="5001", centro_custo=None),
+            _linha("2001", "D009", 601, "01.04.2026", "NF-X"),
+            _linha("2001", "D009", 602, "01.04.2026", "NF-X"),
+            _linha("2002", "D009", 221, "02.04.2026", "NF-Y"),
         ],
     )
-    resultado = historico_mensal.calcular_historico_mensal(
+    mes = historico_mensal.calcular_historico_mensal(
         datetime.date(2026, 4, 1), datetime.date(2026, 4, 30), bases_dir=bases_dir
-    )
-    mes = resultado["2026-04"]
-    assert mes["outros_mes"] == 1
-    assert mes["ordens_mes"] == 1
-    assert mes["reservas_mes"] + mes["ordens_mes"] + mes["outros_mes"] == mes["linhas_atendidas_mes"]
+    )["2026-04"]
+    soma = sum(mes[k] for k in ("reservas_mes", "ordens_mes", "intercompany_mes", "transferencias_mes", "diversos_mes"))
+    assert soma == mes["linhas_atendidas_mes"] == 2
+    assert mes["intercompany_mes"] == 1 and mes["diversos_mes"] == 1
+    assert mes["estornos_qtd_mes"] == 1
 
 
 def test_top5_centro_custo_ordenado_do_maior_pro_menor_sem_outros(tmp_path):
@@ -165,3 +167,22 @@ def test_data_fim_antes_de_data_inicio_lanca_erro(tmp_path):
         historico_mensal.calcular_historico_mensal(
             datetime.date(2026, 5, 1), datetime.date(2026, 4, 1), bases_dir=bases_dir
         )
+
+
+def test_102_e_estorno_com_valor_absoluto_e_nota_estornada_inteira_nao_conta(tmp_path):
+    """55216-1: 101 e 102 de 16 un no mesmo mês -> não é nota recebida; o 102 entra em Estornos
+    com valor em módulo (Fernando 2026-09-28). Estorno parcial não tira a nota."""
+    linhas = [
+        _linha("552558", "D009", 101, "04.09.2026", "55216-1", valor=26837.78),
+        _linha("552558", "D009", 102, "04.09.2026", "55216-1", valor=-26837.78),
+        _linha("7001", "D009", 101, "05.09.2026", "NF-P", valor=100.0),
+        _linha("7001", "D009", 102, "05.09.2026", "NF-P", valor=-40.0),
+        _linha("7002", "D009", 202, "05.09.2026", "R", valor=10.0),
+    ]
+    linhas[0]["Qtd.  UM registro"], linhas[1]["Qtd.  UM registro"] = 16, -16
+    linhas[2]["Qtd.  UM registro"], linhas[3]["Qtd.  UM registro"] = 10, -4
+    bases_dir = _preparar_mb51(tmp_path, linhas)
+    mes = historico_mensal.calcular_historico_mensal(datetime.date(2026, 9, 1), datetime.date(2026, 9, 30), bases_dir=bases_dir)["2026-09"]
+    assert mes["notas_recebidas_mes"] == 1  # só NF-P (estorno parcial)
+    assert mes["estornos_qtd_mes"] == 3
+    assert mes["estornos_valor_mes"] == 26837.78 + 40.0 + 10.0

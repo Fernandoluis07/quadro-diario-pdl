@@ -42,22 +42,28 @@ def _detectar_hoje_ontem(
 ) -> tuple[datetime.date, datetime.date | None]:
     """Se `data_forcada` vier do --data, ela vira 'hoje' e 'ontem' é a data
     presente no arquivo mais recente anterior a ela. Sem `data_forcada`,
-    'hoje' é a data mais recente do arquivo e 'ontem' a segunda mais recente."""
+    'hoje' é a data mais recente do arquivo e 'ontem' a segunda mais recente.
+
+    'Ontem' pula sábado/domingo/feriado quando existe um dia útil antes (2026-09-27): com o
+    fim de semana passando a ser congelado junto, segunda comparava com o sábado de 2 linhas
+    (+1.400% no card). Mesma regra do Calendário (previousBusinessDay no index.html)."""
+    from .saude import eh_dia_util
+
     datas = extratos.datas_disponiveis(df_mb51)
 
+    def _ontem(anteriores: list) -> datetime.date | None:
+        uteis = [d for d in anteriores if eh_dia_util(d)]
+        return uteis[0] if uteis else (anteriores[0] if anteriores else None)
+
     if data_forcada is not None:
-        anteriores = [d for d in datas if d < data_forcada]
-        ontem = anteriores[0] if anteriores else None
-        return data_forcada, ontem
+        return data_forcada, _ontem([d for d in datas if d < data_forcada])
 
     if not datas:
         raise ValueError(
             "MB51 não tem nenhuma data válida em 'Data de lançamento' "
             "após remover linhas de rodapé — não dá pra detectar 'hoje' automaticamente."
         )
-    hoje = datas[0]
-    ontem = datas[1] if len(datas) > 1 else None
-    return hoje, ontem
+    return datas[0], _ontem(datas[1:])
 
 
 def _calcular_bloco1(df_mb51, data: datetime.date) -> dict:

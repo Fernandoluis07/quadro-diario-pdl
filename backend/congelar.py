@@ -110,6 +110,13 @@ def montar_entrada_zmm028(indicadores: dict) -> dict:
     return {campo: indicadores[campo] for campo in CAMPOS_ZMM028}
 
 
+def montar_entrada_fim_de_semana(entrada_mb51_calculada: dict) -> dict:
+    """Sábado/domingo/feriado com movimento: SÓ os 8 indicadores da MB51 (cards 1–8), com o
+    dado real do dia. Sem "intercompany" (card 19 é manual, lembrete entre times): no site, os
+    cards 9–20 repetem o último dia útil (decisão de Fernando 2026-09-27)."""
+    return {campo: entrada_mb51_calculada[campo] for campo in CAMPOS_MB51}
+
+
 def _classe_status(status: str) -> str:
     return _STATUS_CLASSE.get(sem_acento_maiusculo(status), "scheduled")
 
@@ -319,7 +326,11 @@ def congelar_dia(
     data_ontem_iso = indicadores.get("data_referencia_ontem")
     ontem_manual = historico_manuais.get(data_ontem_iso) if data_ontem_iso else None
     entrada_mb51_ontem = historico_mb51.get(data_ontem_iso) if data_ontem_iso else None
-    ontem_intercompany = {"intercompany": entrada_mb51_ontem["intercompany"]} if entrada_mb51_ontem else None
+    # .get: entrada de fim de semana (congelar_fim_de_semana) não tem intercompany — é manual
+    ontem_intercompany = (
+        {"intercompany": entrada_mb51_ontem["intercompany"]}
+        if entrada_mb51_ontem and "intercompany" in entrada_mb51_ontem else None
+    )
 
     historico_mb51 = {**historico_mb51, data_iso: entrada_mb51}
     historico_manuais = {**historico_manuais, data_iso: entrada_manual}
@@ -406,5 +417,40 @@ def congelar_dia(
         "arquivos_json_atualizados": [
             caminho_mb51_json, caminho_manuais_json, caminho_zmm028_json, caminho_mensal_json, caminho_paineis_json,
         ],
+        "index_html_atualizado": index_path,
+    }
+
+
+def congelar_fim_de_semana(
+    *,
+    repo_root: str,
+    index_path: str,
+    data_ref: datetime.date,
+    entrada_mb51: dict,
+    forcar: bool = False,
+) -> dict:
+    """Congela um sábado/domingo/feriado COM movimento: grava SÓ historico_mb51 (8 campos, ver
+    montar_entrada_fim_de_semana) + a constante HISTORICO_MB51. Todo o resto (cards 9–20, Gestão
+    de Estoque, Resumo do Mês) fica com o dado da sexta (decisão de Fernando 2026-09-28): o
+    Resumo do Mês é fechado no último dia útil pelo Cabeçalho, e o site mostra o Início e a
+    Gestão no último dia útil. Dia sem movimento nem chega aqui: o Calendário o bloqueia."""
+    data_iso = data_ref.isoformat()
+    caminho_mb51_json = os.path.join(repo_root, "historico_mb51.json")
+    historico_mb51 = _carregar_json(caminho_mb51_json)
+    if ja_congelado(historico_mb51, data_iso) and not forcar:
+        raise DiaJaCongeladoError(f"O dia {data_iso} já tinha sido congelado antes — nada foi alterado.")
+
+    historico_mb51 = {**historico_mb51, data_iso: montar_entrada_fim_de_semana(entrada_mb51)}
+    _salvar_json(caminho_mb51_json, historico_mb51)
+
+    with open(index_path, "r", encoding="utf-8") as f:
+        html_novo = f.read()
+    html_novo = atualizar_constante_historico_js(html_novo, "HISTORICO_MB51", historico_mb51)
+    with open(index_path, "w", encoding="utf-8") as f:
+        f.write(html_novo)
+
+    return {
+        "data": data_iso,
+        "arquivos_json_atualizados": [caminho_mb51_json],
         "index_html_atualizado": index_path,
     }

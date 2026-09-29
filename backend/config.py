@@ -59,11 +59,43 @@ DEPOSITOS_VALIDOS = {DEPOSITO_D009, DEPOSITO_D016}
 
 # Tipos de movimento (BWART) por categoria — Bloco 1 (fonte MB51).
 BWART_ATENDIMENTO = {"201", "221", "261", "601", "122", "833", "921"}
-BWART_ESTORNO = {"202", "222", "262", "602", "834", "123"}
+# 102 = estorno de recebimento (101) — entra como Estorno por decisão de Fernando 2026-09-28
+# (970 linhas na MB51 ficavam fora de todos os grupos).
+BWART_ESTORNO = {"202", "222", "262", "602", "834", "123", "102"}
+BWART_ESTORNO_RECEBIMENTO = {"102"}
 BWART_RECEBIMENTO = {"101", "835"}
 # 601/833 também entram em BWART_ATENDIMENTO acima — Intercompany é uma leitura adicional
 # sobre as MESMAS movimentações (por documento único, não por linha), não uma categoria à parte.
 BWART_INTERCOMPANY = {"601", "833"}
+
+# Resumo do Mês — quebra do Atendimento em 5 grupos (decisão de Fernando 2026-09-27), todos
+# contados em LINHAS da MB51 e somando exatamente "Linhas Atendidas no Mês". 601 = Intercompany
+# (saída por remessa SAP), 833 = Transferências (NF de transferência, lançada quase toda pela
+# matrícula 4058) — confirmado por Fernando olhando os dados. Diversos = todo o resto de
+# BWART_ATENDIMENTO (hoje 122, 221, 921), calculado por exclusão: tipo novo cai aqui sozinho.
+# Nada a ver com o card 19 (Intercompany manual da planilha), que é lembrete entre times.
+BWART_RESUMO_RESERVAS = {"201"}
+BWART_RESUMO_ORDENS = {"261"}
+BWART_RESUMO_INTERCOMPANY = {"601"}
+BWART_RESUMO_TRANSFERENCIAS = {"833"}
+
+# Checklist de Bipagem (Fase 2): só audita dias a partir desta data. 21–24/09/2026 foram o
+# teste da Fase 1 e não são resultado real (decisão de Fernando 2026-09-27).
+CHECKLIST_BIPAGEM_INICIO = "2026-09-25"
+# Base de bipagem (Power Query sobre o SharePoint) e cadastro de matrículas — ficam em
+# "01. Calculadora\\Bases" (gitignored), junto da MM60.
+SHAREPOINT_FILENAME = "Share Point.xlsx"
+MATRICULA_FILENAME = "Matricula.xlsx"
+
+# Sexta (ou qualquer dia útil) processada numa extração que já traz o fim de semana: estes 4
+# indicadores de saldo são RECONSTRUÍDOS desfazendo os movimentos posteriores (backend/
+# reconstruir.zmm028_no_fim_do_dia) em vez de usar a foto da ZMM028 tirada depois do sábado.
+# Backtest 2026-09-27 (1 a 3 dias desfeitos, 18–23/09): itens com saldo e saldo zero exatos,
+# valor com erro de até R$ 2,4 mil; itens sem endereço não enxerga endereço alterado no SAP
+# depois do dia (a MB51 não registra). Tirar um nome daqui = volta a usar a foto da extração.
+INDICADORES_SALDO_RECONSTRUIDOS = (
+    "itens_estoque_com_saldo", "valor_estoque_total", "itens_mrp_saldo_zero", "itens_sem_endereco",
+)
 
 # "Já teve baixa/saída real alguma vez" — conceito usado pelo indicador 4 (Materiais
 # Nunca Movimentados) e reutilizável por qualquer outro indicador que precise da mesma

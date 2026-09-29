@@ -35,7 +35,7 @@ import os
 
 import pandas as pd
 
-from . import config, congelar, extratos, historico, indicadores
+from . import config, congelar, extratos, historico, historico_mensal, indicadores
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REGISTRO_PADRAO = os.path.join(REPO_ROOT, "dias_reconstruidos.json")
@@ -46,7 +46,11 @@ CAMPOS_COMPARAVEIS = ("itens_estoque_com_saldo", "valor_estoque_total", "itens_m
 
 
 def zmm028_no_fim_do_dia(
-    zmm028_d009: pd.DataFrame, mb51: pd.DataFrame, data: datetime.date, data_snapshot: datetime.date
+    zmm028_d009: pd.DataFrame,
+    mb51: pd.DataFrame,
+    data: datetime.date,
+    data_snapshot: datetime.date,
+    mm60: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """ZMM028 (D009) como estava no FECHAMENTO de `data`, sabendo que `zmm028_d009`
     representa o fechamento de `data_snapshot` (movimentos posteriores a `data` e até
@@ -57,14 +61,41 @@ def zmm028_no_fim_do_dia(
     datas = dep["_data_norm"]
     mov = dep.loc[datas.map(lambda d: d is not None and data < d <= data_snapshot)]
     chave = indicadores._normalizar_material(mov["Material"])
-    qtd = pd.to_numeric(mov["Qtd.  UM registro"], errors="coerce").fillna(0).groupby(chave).sum()
-    val = pd.to_numeric(mov["Montante em MI"], errors="coerce").fillna(0).groupby(chave).sum()
+    qtd_linha = pd.to_numeric(mov["Qtd.  UM registro"], errors="coerce").fillna(0)
+    val_linha = pd.to_numeric(mov["Montante em MI"], errors="coerce").fillna(0)
 
     df = zmm028_d009.copy()
     mat = indicadores._normalizar_material(df["Material"])
-    df["Util.livre"] = pd.to_numeric(df["Util.livre"], errors="coerce").fillna(0) - mat.map(qtd).fillna(0)
-    df["Val.total"] = pd.to_numeric(df["Val.total"], errors="coerce").fillna(0) - mat.map(val).fillna(0)
-    return df
+    livre = pd.to_numeric(df["Util.livre"], errors="coerce").fillna(0)
+    total = pd.to_numeric(df["Val.total"], errors="coerce").fillna(0)
+
+    # Transferência entre depósitos (311/313/315...) vem SEMPRE com Montante em MI = 0 na MB51,
+    # mas muda o Val.total do D009 na ZMM028 — sem isto, desfazer as 27 transferências de 23/09
+    # errava o valor do estoque em ~R$ 161 mil (backtest 2026-09-27). Linha com quantidade e
+    # sem valor é valorizada pelo preço da MM60; sem MM60, pelo preço médio do material no
+    # snapshot. (Só o preço médio do snapshot não basta: quem transferiu o saldo INTEIRO pro
+    # D016 fica com Util.livre 0 no snapshot, sem preço — explicava só R$ 66 mil dos 161 mil.)
+    livre_mat, total_mat = livre.groupby(mat).sum(), total.groupby(mat).sum()
+    preco = (total_mat / livre_mat).where(livre_mat != 0)
+    if mm60 is not None:
+        preco_mm60 = pd.to_numeric(mm60["Preço"], errors="coerce")
+        preco_mm60 = preco_mm60.where(preco_mm60 > 0).groupby(indicadores._normalizar_material(mm60["Material"])).first()
+        preco = preco_mm60.combine_first(preco)
+    sem_valor = (val_linha == 0) & (qtd_linha != 0)
+    val_linha = val_linha.where(~sem_valor, qtd_linha * chave.map(preco).fillna(0))
+
+    qtd = qtd_linha.groupby(chave).sum()
+    val = val_linha.groupby(chave).sum()
+    df["Util.livre"] = livre - mat.map(qtd).fillna(0)
+    df["Val.total"] = total - mat.map(val).fillna(0)
+
+    # Material cujo PRIMEIRO movimento na MB51 (qualquer depósito) é posterior a `data` ainda
+    # não existia na ZMM028 daquele dia — sem isto, voltava como "VB com saldo zero" e o
+    # Itens MRP Saldo Zero saía +1/+2 (506096/862599, backtest 2026-09-27).
+    com_data = mb51.loc[mb51["_data_norm"].notna()]
+    primeiro = com_data.groupby(indicadores._normalizar_material(com_data["Material"]))["_data_norm"].min()
+    ainda_nao_existia = mat.map(primeiro).map(lambda d: isinstance(d, datetime.date) and d > data)
+    return df.loc[~(ainda_nao_existia & (df["Util.livre"] == 0))]
 
 
 def indicadores_zmm028_em(
@@ -75,7 +106,7 @@ def indicadores_zmm028_em(
     data_snapshot: datetime.date,
 ) -> dict:
     """Entrada de historico_zmm028.json (mesmos 16 campos de congelar.CAMPOS_ZMM028) para `data`."""
-    z = zmm028_no_fim_do_dia(zmm028_d009, mb51, data, data_snapshot)
+    z = zmm028_no_fim_do_dia(zmm028_d009, mb51, data, data_snapshot, mm60)
     mb51_ate = mb51.loc[mb51["_data_norm"].map(lambda d: d is not None and d <= data)]
     qtd_vb, valor_vb = indicadores.resumo_vb(z)
     abaixo = indicadores.materiais_abaixo_estoque_minimo(z, mm60, valor_vb)
@@ -123,9 +154,14 @@ def montar_dia(zmm028_d009, mb51, mm60, data, data_snapshot) -> dict:
     }
 
 
-def gravar_dia(repo_root: str, index_path: str, dias: dict[str, dict], data_snapshot: datetime.date, agora: datetime.datetime) -> None:
+def gravar_dia(
+    repo_root: str, index_path: str, dias: dict[str, dict], data_snapshot: datetime.date, agora: datetime.datetime,
+    resumo_mes: dict | None = None,
+) -> None:
     """Grava as entradas (recusa sobrescrever dia já congelado) em historico_mb51/zmm028.json,
-    nas constantes do index.html e no registro de proveniência — tudo a partir do MESMO dict."""
+    nas constantes do index.html e no registro de proveniência — tudo a partir do MESMO dict.
+    `resumo_mes`: meses recalculados dos dias reconstruídos — sem isso o Resumo do Mês ficava sem
+    o dia (agosto ficou sem o 31/08 até 2026-09-27: 1.146 linhas em vez de 1.202)."""
     caminho_mb51 = os.path.join(repo_root, "historico_mb51.json")
     caminho_zmm = os.path.join(repo_root, "historico_zmm028.json")
     h_mb51 = congelar._carregar_json(caminho_mb51)
@@ -152,6 +188,12 @@ def gravar_dia(repo_root: str, index_path: str, dias: dict[str, dict], data_snap
         html = f.read()
     html = congelar.atualizar_constante_historico_js(html, "HISTORICO_MB51", h_mb51)
     html = congelar.atualizar_constante_historico_js(html, "HISTORICO_ZMM028", h_zmm)
+
+    if resumo_mes:
+        caminho_mensal = os.path.join(repo_root, "historico_mensal.json")
+        h_mensal = congelar.atualizar_historico_mensal(congelar._carregar_json(caminho_mensal), resumo_mes)
+        html = congelar.atualizar_constante_historico_js(html, "HISTORICO_MENSAL", h_mensal)
+        congelar._salvar_json(caminho_mensal, h_mensal)
 
     congelar._salvar_json(caminho_mb51, h_mb51)
     congelar._salvar_json(caminho_zmm, h_zmm)
@@ -190,7 +232,11 @@ def main() -> None:
         for d, e in dias.items():
             print(f"\n{d}\n  mb51  : {json.dumps(e['mb51'], ensure_ascii=False)}\n  zmm028: {json.dumps(e['zmm028'], ensure_ascii=False)}")
         if args.gravar:
-            gravar_dia(REPO_ROOT, os.path.join(REPO_ROOT, "index.html"), dias, data_snapshot, datetime.datetime.now())
+            meses = sorted({d.replace(day=1) for d in args.datas})
+            ultimo_dia = max(extratos.datas_disponiveis(mb51))
+            resumo = historico_mensal.calcular_historico_mensal(meses[0], ultimo_dia, df_mb51=mb51)
+            resumo = {k: v for k, v in resumo.items() if k in {m.strftime("%Y-%m") for m in meses}}
+            gravar_dia(REPO_ROOT, os.path.join(REPO_ROOT, "index.html"), dias, data_snapshot, datetime.datetime.now(), resumo)
             print(f"\nGravado: {', '.join(dias)} (historico_mb51/zmm028.json, index.html, dias_reconstruidos.json)")
         else:
             print("\n(nada gravado — use --gravar)")

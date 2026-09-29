@@ -73,3 +73,27 @@ def test_gravar_dia_recusa_sobrescrever_dia_ja_congelado_e_nao_escreve_nada(tmp_
         reconstruir.gravar_dia(repo, index, {"2026-09-03": {"mb51": {}, "zmm028": {}}}, D(2026, 9, 17), datetime.datetime.now())
     assert (tmp_path / "index.html").read_text(encoding="utf-8") == antes
     assert not (tmp_path / "dias_reconstruidos.json").exists()
+
+
+def test_transferencia_sem_valor_na_mb51_e_valorizada_pelo_preco_da_mm60():
+    """311 vem com Montante 0 na MB51 mas muda o Val.total do D009 (erro de R$ 161 mil no backtest)."""
+    z = _zmm([["1001", 0, 0.0, "VB", "A1"], ["1002", 5, 50.0, "VB", "A2"]])
+    mb = _mb51([
+        ["1001", "D009", D(2026, 9, 23), -3, 0.0],   # transferiu o saldo INTEIRO pro D016: sem preço no snapshot
+        ["1002", "D009", D(2026, 9, 23), -2, 0.0],   # sem MM60: usa o preço médio do snapshot (10)
+    ])
+    mm60 = pd.DataFrame([{"Material": "1001", "Preço": 7.5}])
+    r = reconstruir.zmm028_no_fim_do_dia(z, mb, D(2026, 9, 22), D(2026, 9, 23), mm60)
+    assert r.loc[0, "Val.total"] == 22.5 and r.loc[1, "Val.total"] == 70.0
+
+
+def test_material_que_ainda_nao_existia_no_dia_sai_da_zmm028_reconstruida():
+    z = _zmm([["1001", 0, 0.0, "VB", "A1"], ["1002", 0, 0.0, "VB", "A2"]])
+    mb = _mb51([
+        ["1001", "D009", D(2026, 9, 24), 2, 20.0],    # primeira movimentação da vida: 24/09
+        ["1001", "D009", D(2026, 9, 24), -2, -20.0],
+        ["1002", "D009", D(2026, 9, 1), 1, 10.0],     # já existia
+        ["1002", "D009", D(2026, 9, 2), -1, -10.0],
+    ])
+    r = reconstruir.zmm028_no_fim_do_dia(z, mb, D(2026, 9, 23), D(2026, 9, 24))
+    assert list(r["Material"]) == ["1002"]

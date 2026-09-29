@@ -216,3 +216,11 @@ def test_sem_segunda_data_no_arquivo_ontem_fica_none(tmp_path, monkeypatch):
     assert resultado["data_referencia"] == "2026-08-05"
     assert resultado["data_referencia_ontem"] is None
     assert resultado["ontem"] is None
+
+
+def test_ontem_pula_o_fim_de_semana_quando_ha_dia_util_antes():
+    """Segunda 28/09 com movimento no sábado 26/09: 'ontem' é a sexta 25/09, não o sábado
+    (fim de semana passou a ser congelado junto — 2026-09-27)."""
+    mb51 = pd.DataFrame({"_data_norm": [datetime.date(2026, 9, 25), datetime.date(2026, 9, 26), datetime.date(2026, 9, 28)]})
+    assert main._detectar_hoje_ontem(mb51, None) == (datetime.date(2026, 9, 28), datetime.date(2026, 9, 25))
+    assert main._detectar_hoje_ontem(mb51, datetime.date(2026, 9, 28))[1] == datetime.date(2026, 9, 25)
