@@ -347,6 +347,51 @@ def test_materiais_acima_estoque_maximo_itens_colunas_e_sinal_positivo():
     assert item["endereco"] == "C-03"
 
 
+# ---- Ponto de Reabast. 1 e Estoque Máx. 1 ------------------------------------
+
+def test_materiais_pt_reabast_1_max_1_exige_os_dois_iguais_a_1_e_so_vb():
+    zmm028 = _zmm028_gestao(
+        [
+            {"Material": "1", "Util.livre": 1, "Pt.reabast": 1, "Estq.máx.": 1},
+            {"Material": "2", "Util.livre": 1, "Pt.reabast": 1, "Estq.máx.": 2},   # máx. 2: fora
+            {"Material": "3", "Util.livre": 1, "Pt.reabast": 2, "Estq.máx.": 1},   # pt 2: fora
+            {"Material": "4", "Util.livre": 1, "Pt.reabast": 1, "Estq.máx.": 1, "Tp.MRP": "ND"},  # ND: fora
+            {"Material": "5", "Util.livre": 1, "Pt.reabast": 0, "Estq.máx.": 0},
+        ]
+    )
+    resultado = indicadores.materiais_pt_reabast_1_max_1(zmm028)
+    assert resultado["qtd"] == 1
+    assert resultado["total_vb"] == 4
+    assert [i["material"] for i in resultado["itens"]] == ["1"]
+
+
+def test_materiais_pt_reabast_1_max_1_faixas_de_saldo_e_ordem_dos_itens():
+    """Zerado inclui saldo negativo; faixas somam o total; zerados vêm primeiro na lista."""
+    zmm028 = _zmm028_gestao(
+        [
+            {"Material": "30", "Util.livre": 5, "Pt.reabast": 1, "Estq.máx.": 1},
+            {"Material": "20", "Util.livre": 1, "Pt.reabast": 1, "Estq.máx.": 1},
+            {"Material": "10", "Util.livre": 0, "Pt.reabast": 1, "Estq.máx.": 1},
+            {"Material": "11", "Util.livre": -2, "Pt.reabast": 1, "Estq.máx.": 1},
+            {"Material": "21", "Util.livre": 1, "Pt.reabast": 1, "Estq.máx.": 1},
+        ]
+    )
+    resultado = indicadores.materiais_pt_reabast_1_max_1(zmm028)
+    assert (resultado["zerados"], resultado["saldo_um"], resultado["saldo_acima"]) == (2, 2, 1)
+    assert resultado["qtd"] == 5
+    assert [i["material"] for i in resultado["itens"]] == ["11", "10", "20", "21", "30"]
+    assert resultado["itens"][0] == {
+        "material": "11", "descricao": "Item x", "unidade": "UN", "classe": "VB",
+        "saldo_atual": -2.0, "pt_reabast": 1.0, "estoque_maximo": 1.0, "endereco": "A-01",
+    }
+
+
+def test_materiais_pt_reabast_1_max_1_sem_nenhum_material():
+    zmm028 = _zmm028_gestao([{"Material": "1", "Util.livre": 3, "Pt.reabast": 2, "Estq.máx.": 5}])
+    resultado = indicadores.materiais_pt_reabast_1_max_1(zmm028)
+    assert resultado == {"qtd": 0, "total_vb": 1, "zerados": 0, "saldo_um": 0, "saldo_acima": 0, "itens": []}
+
+
 # ---- Indicador 4 — Materiais Nunca Movimentados -----------------------------
 
 def _mb51_mov(rows):

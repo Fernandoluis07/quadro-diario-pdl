@@ -116,6 +116,10 @@ def test_calcula_indicadores_gestao_estoque_1_2_5(tmp_path, monkeypatch):
     assert resultado["materiais_abaixo_estoque_minimo_valor_total"] == 0.0
     assert resultado["materiais_acima_estoque_maximo_qtd"] == 0
     assert resultado["materiais_acima_estoque_maximo_valor_total"] == 0.0
+    # mesmo material 3001 (VB, Pt.reabast 1 e Estq.máx. 1, saldo 1) entra no indicador Pt.1/Máx.1
+    pt1 = resultado["materiais_pt1_max1"]
+    assert (pt1["qtd"], pt1["zerados"], pt1["saldo_um"], pt1["saldo_acima"]) == (1, 0, 1, 0)
+    assert pt1["itens"][0]["material"] == "3001"
     assert resultado["classificacao_mrp"]["total"] == 1
     itens_por_classe = {i["classe"]: i for i in resultado["classificacao_mrp"]["itens"]}
     assert itens_por_classe["VB"] == {"classe": "VB", "qtd": 1, "valor_total": 10.0}

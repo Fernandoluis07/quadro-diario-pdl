@@ -1,4 +1,5 @@
-r"""Agregados MENSAIS pro Resumo do Mês (fixo em D009, sem comparação entre meses).
+r"""Agregados MENSAIS pro Resumo do Mês (fixo em D009) e pro Comparativo Mensal (chave
+"comparativo" de cada mês, D009 e D016 separados — ver comparativo_deposito).
 
 Diferente de historico.py/historico_manuais.py/historico_zmm028.py (todos diários), este módulo
 agrega por mês inteiro. Existe porque boa parte do Resumo do Mês não dá pra derivar do que já
@@ -87,6 +88,67 @@ def _meses_no_periodo(data_inicio: datetime.date, data_fim: datetime.date) -> li
     return meses
 
 
+DEPOSITOS_COMPARATIVO = (config.DEPOSITO_D009, config.DEPOSITO_D016)
+
+
+def _valor_abs(df: pd.DataFrame) -> float:
+    return round(float(pd.to_numeric(df["Montante em MI"], errors="coerce").fillna(0).abs().sum()), 2)
+
+
+def comparativo_deposito(
+    df_mb51: pd.DataFrame, deposito: str, inicio_mes: datetime.date, fim_mes: datetime.date
+) -> dict:
+    """Os 7 números do Comparativo Mensal pra UM depósito, com EXATAMENTE a lógica do Resumo
+    do Mês (_calcular_mes, que é fixo em D009) — só troca o depósito. Pra D009 os totais batem
+    1:1 com as chaves do Resumo (conferido 2026-09-29 nos 6 meses de abril a setembro).
+    Valor atendido sai em módulo (o card mostra positivo; o Resumo guarda negativo e aplica
+    abs na tela). `diario`: uma lista por indicador, um valor por dia corrido de inicio_mes a
+    fim_mes (fim de semana incluso, normalmente 0) — é a linha "evolução dia a dia" do card.
+    Notas por dia é o dedup do dia; somar os dias pode dar diferente do total do mês (a
+    mesma nota em 2 dias conta nos 2), e é por isso que o total vem calculado à parte."""
+    df_dep = df_mb51.loc[df_mb51["_deposito_norm"] == deposito]
+    df_mes = df_dep.loc[(df_dep["_data_norm"] >= inicio_mes) & (df_dep["_data_norm"] <= fim_mes)]
+
+    def recortes(df):
+        return (
+            df.loc[df["_bwart_norm"].isin(config.BWART_ATENDIMENTO)],
+            df.loc[df["_bwart_norm"].isin(config.BWART_RECEBIMENTO)],
+            df.loc[df["_bwart_norm"].isin(config.BWART_ESTORNO)],
+        )
+
+    atend, receb, estorno = recortes(df_mes)
+    diario = {chave: [] for chave in (
+        "linhas_atendidas", "notas_recebidas", "estornos_qtd", "inventario_rotativo",
+        "valor_atendido", "valor_estornado", "valor_recebido",
+    )}
+    dia, um_dia = inicio_mes, datetime.timedelta(days=1)
+    inventario_total = 0
+    while dia <= fim_mes:
+        df_dia = df_mes.loc[df_mes["_data_norm"] == dia]
+        a, r, e = recortes(df_dia)
+        inv = int(df_dia["Material"].nunique())  # = indicadores.inventario_rotativo, sem refiltrar a MB51 inteira
+        inventario_total += inv
+        diario["linhas_atendidas"].append(len(a))
+        diario["notas_recebidas"].append(len(indicadores.referencias_recebidas(df_dia)))
+        diario["estornos_qtd"].append(len(e))
+        diario["inventario_rotativo"].append(inv)
+        diario["valor_atendido"].append(abs(_soma_valor(a)))
+        diario["valor_estornado"].append(_valor_abs(e))
+        diario["valor_recebido"].append(_soma_valor(r))
+        dia += um_dia
+
+    return {
+        "linhas_atendidas": len(atend),
+        "notas_recebidas": len(indicadores.referencias_recebidas(df_mes)),
+        "estornos_qtd": len(estorno),
+        "inventario_rotativo": inventario_total,
+        "valor_atendido": abs(_soma_valor(atend)),
+        "valor_estornado": _valor_abs(estorno),
+        "valor_recebido": _soma_valor(receb),
+        "diario": diario,
+    }
+
+
 def _calcular_mes(
     df_mb51: pd.DataFrame, ano: int, mes: int, data_inicio: datetime.date, data_fim: datetime.date
 ) -> dict:
@@ -129,6 +191,8 @@ def _calcular_mes(
         # valor ABSOLUTO: 202/222/262/602/834/123 vêm positivos e o 102 (estorno de recebimento,
         # 2026-09-28) vem sempre negativo — somar com sinal fazia um descontar o outro
         "estornos_valor_mes": round(float(pd.to_numeric(df_estorno["Montante em MI"], errors="coerce").fillna(0).abs().sum()), 2),
+        # Comparativo Mensal: mesmos números, separados por depósito (ver comparativo_deposito)
+        "comparativo": {dep: comparativo_deposito(df_mb51, dep, inicio_mes, fim_mes) for dep in DEPOSITOS_COMPARATIVO},
     }
 
 

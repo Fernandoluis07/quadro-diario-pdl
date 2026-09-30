@@ -98,6 +98,7 @@ const CLASSIFICACAO_MRP = {"total":0,"itens":[]};
 const MATERIAIS_ABAIXO_MINIMO = {"itens":[]};
 const MATERIAIS_ACIMA_MAXIMO = {"itens":[]};
 const MATERIAIS_NUNCA_MOVIMENTADOS = {"itens":[]};
+const MATERIAIS_PT1_MAX1 = {"qtd":0,"itens":[]};
 const AVALIACAO_MRP = {"qtd":0,"itens":[]};
 </script>
 </body></html>
@@ -146,6 +147,13 @@ INDICADORES_HOJE = {
          "quantidade": 200.0, "endereco": "C-03", "valor": 2000.0,
          "data_entrada": "2022-03-01", "tempo_parado": "4 anos e 5 meses"},
     ],
+    "materiais_pt1_max1": {
+        "qtd": 635, "total_vb": 2831, "zerados": 39, "saldo_um": 344, "saldo_acima": 252,
+        "itens": [
+            {"material": "700100", "descricao": "Selo mecânico", "unidade": "UN", "classe": "VB",
+             "saldo_atual": 0.0, "pt_reabast": 1.0, "estoque_maximo": 1.0, "endereco": "D-04"},
+        ],
+    },
     "classificacao_mrp": {
         "total": 3052,
         "itens": [
@@ -381,6 +389,8 @@ def test_congelar_dia_grava_os_5_json_e_atualiza_index_html(tmp_path):
     assert 'const MATERIAIS_ABAIXO_MINIMO = {"itens":[{"material":"100245"' in html_novo
     assert 'const MATERIAIS_ACIMA_MAXIMO = {"itens":[{"material":"100381"' in html_novo
     assert 'const MATERIAIS_NUNCA_MOVIMENTADOS = {"itens":[{"material":"100512"' in html_novo
+    assert 'const MATERIAIS_PT1_MAX1 = {"itens":[{"material":"700100"' in html_novo
+    assert '"qtd":635,"saldo_acima":252,"saldo_um":344,"total_vb":2831,"zerados":39}' in html_novo
     assert 'const AVALIACAO_MRP = {"itens":[{"material":"805280"' in html_novo
 
 

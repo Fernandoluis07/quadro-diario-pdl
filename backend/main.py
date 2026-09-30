@@ -148,6 +148,7 @@ def calcular_todos_indicadores(
         "materiais_nunca_movimentados_pct_valor_vb": nunca_movimentados["pct_valor_vb"],
         "materiais_nunca_movimentados_pct_distribuicao": nunca_movimentados["pct_distribuicao"],
         "materiais_nunca_movimentados_itens": nunca_movimentados["itens"],
+        "materiais_pt1_max1": indicadores.materiais_pt_reabast_1_max_1(zmm028),
         "classificacao_mrp": indicadores.classificacao_mrp(zmm028_todos_depositos),
         "avaliacao_mrp": avaliacao_mrp,
         "materiais_vb_sem_preco_mm60": indicadores.materiais_vb_sem_preco_mm60(zmm028, mm60),

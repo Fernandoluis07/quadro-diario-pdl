@@ -403,6 +403,11 @@ def congelar_dia(
     html_novo = atualizar_constante_historico_js(
         html_novo, "MATERIAIS_NUNCA_MOVIMENTADOS", {"itens": indicadores["materiais_nunca_movimentados_itens"]}
     )
+    # Ponto de Reabast. 1 e Estoque Máx. 1 (Gestão de Estoque): contagens do card + lista
+    # de exportação juntas, mesma "fotografia atual" das listas acima — sem histórico por dia.
+    html_novo = atualizar_constante_historico_js(
+        html_novo, "MATERIAIS_PT1_MAX1", indicadores["materiais_pt1_max1"]
+    )
 
     html_novo = atualizar_painel_pontos_avisos(html_novo, pontos_atencao, avisos_importantes)
     html_novo = atualizar_painel_datas_importantes(html_novo, datas_importantes)

@@ -277,6 +277,45 @@ def materiais_acima_estoque_maximo(
     }
 
 
+def materiais_pt_reabast_1_max_1(df_zmm028_d009: pd.DataFrame) -> dict:
+    """Depósito D009, Classificação MRP = VB, Pt.reabast = 1 E Estq.máx. = 1 (os dois
+    exatamente 1) — cadastro mal configurado no SAP: o MRP só pede reposição quando o
+    saldo cai abaixo de 1, ou seja, quando já zerou, então o material vira stock-out na
+    primeira baixa. ND fica de fora (decisão de negócio 2026-09-29, mesmo recorte VB dos
+    indicadores 1/2). Divide os materiais em 3 faixas de saldo atual (Util.livre) pro
+    gráfico: já zerados (<= 0), saldo exatamente 1 (a próxima baixa zera) e 2 ou mais.
+    `total_vb` é o denominador do "% dos materiais VB" do card. `itens`: lista pra
+    exportação, zerados primeiro (saldo crescente), depois por código."""
+    tp_mrp = df_zmm028_d009["Tp.MRP"].astype(str).str.strip()
+    vb = df_zmm028_d009.loc[tp_mrp == "VB"]
+    pt_reabast = pd.to_numeric(vb["Pt.reabast"], errors="coerce")
+    estq_max = pd.to_numeric(vb["Estq.máx."], errors="coerce")
+    alvo = vb.loc[(pt_reabast == 1) & (estq_max == 1)]
+    saldo = _util_livre(alvo)
+
+    tabela = pd.DataFrame(
+        {
+            "material": _normalizar_material(alvo["Material"]),
+            "descricao": alvo["Denom."].astype(str).str.strip(),
+            "unidade": alvo["Unidade"].astype(str).str.strip(),
+            "classe": "VB",
+            "saldo_atual": saldo.round(2),
+            "pt_reabast": 1.0,
+            "estoque_maximo": 1.0,
+            "endereco": alvo["Pos.dpst."].astype(str).str.strip(),
+        }
+    ).sort_values(["saldo_atual", "material"], kind="stable")
+
+    return {
+        "qtd": int(len(alvo)),
+        "total_vb": int(len(vb)),
+        "zerados": int((saldo <= 0).sum()),
+        "saldo_um": int((saldo == 1).sum()),
+        "saldo_acima": int((saldo > 1).sum()),
+        "itens": tabela.to_dict(orient="records"),
+    }
+
+
 def _formatar_tempo_parado(data_entrada: datetime.date, hoje: datetime.date) -> str:
     """'3 anos e 5 meses' — omite a parte de anos quando for 0 (ex: '5 meses')."""
     meses_totais = (hoje.year - data_entrada.year) * 12 + (hoje.month - data_entrada.month)

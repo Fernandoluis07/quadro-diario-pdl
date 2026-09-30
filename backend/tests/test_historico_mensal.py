@@ -186,3 +186,52 @@ def test_102_e_estorno_com_valor_absoluto_e_nota_estornada_inteira_nao_conta(tmp
     assert mes["notas_recebidas_mes"] == 1  # só NF-P (estorno parcial)
     assert mes["estornos_qtd_mes"] == 3
     assert mes["estornos_valor_mes"] == 26837.78 + 40.0 + 10.0
+
+
+# ---- Comparativo Mensal: mesmos números do Resumo, separados por depósito ----
+
+def _mes_misto(tmp_path):
+    linhas = [
+        _linha("1001", "D009", 201, "01.04.2026", "R1", valor=-10.0),
+        _linha("1002", "D009", 261, "01.04.2026", "R2", valor=-5.0),
+        _linha("1003", "D009", 101, "02.04.2026", "NF-1", valor=100.0),
+        _linha("1004", "D009", 202, "03.04.2026", "E1", valor=4.0),
+        _linha("2001", "D016", 201, "02.04.2026", "R3", valor=-7.0),
+        _linha("2002", "D016", 101, "02.04.2026", "NF-2", valor=50.0),
+        _linha("2002", "D016", 101, "03.04.2026", "NF-2", valor=25.0),  # mesma nota em 2 dias
+    ]
+    return historico_mensal.calcular_historico_mensal(
+        datetime.date(2026, 4, 1), datetime.date(2026, 4, 30), bases_dir=_preparar_mb51(tmp_path, linhas)
+    )["2026-04"]
+
+
+def test_comparativo_d009_bate_com_as_chaves_do_resumo_do_mes(tmp_path):
+    mes = _mes_misto(tmp_path)
+    d009 = mes["comparativo"]["D009"]
+    assert d009["linhas_atendidas"] == mes["linhas_atendidas_mes"] == 2
+    assert d009["notas_recebidas"] == mes["notas_recebidas_mes"] == 1
+    assert d009["estornos_qtd"] == mes["estornos_qtd_mes"] == 1
+    assert d009["inventario_rotativo"] == mes["inventario_rotativo_mes"] == 4
+    assert d009["valor_atendido"] == abs(mes["valor_atendido_mes"]) == 15.0
+    assert d009["valor_estornado"] == mes["estornos_valor_mes"] == 4.0
+    assert d009["valor_recebido"] == mes["valor_recebido_mes"] == 100.0
+
+
+def test_comparativo_d016_separado_e_diario_por_dia_corrido(tmp_path):
+    d016 = _mes_misto(tmp_path)["comparativo"]["D016"]
+    assert (d016["linhas_atendidas"], d016["notas_recebidas"], d016["valor_atendido"], d016["valor_recebido"]) == (1, 1, 7.0, 75.0)
+    assert d016["inventario_rotativo"] == 3  # dia 2: 2001 e 2002; dia 3: 2002 de novo
+    diario = d016["diario"]
+    assert all(len(serie) == 30 for serie in diario.values())  # abril inteiro, fim de semana incluso
+    assert diario["notas_recebidas"][:4] == [0, 1, 1, 0]  # dedup por dia: soma 2, total do mês 1
+    assert diario["valor_recebido"][:4] == [0.0, 50.0, 25.0, 0.0]
+    assert diario["linhas_atendidas"][1] == 1
+
+
+def test_comparativo_mes_parcial_vai_ate_data_fim(tmp_path):
+    bases_dir = _preparar_mb51(tmp_path, [_linha("1001", "D009", 201, "10.09.2026", "A")])
+    mes = historico_mensal.calcular_historico_mensal(
+        datetime.date(2026, 9, 1), datetime.date(2026, 9, 10), bases_dir=bases_dir
+    )["2026-09"]
+    assert len(mes["comparativo"]["D009"]["diario"]["linhas_atendidas"]) == 10
+    assert mes["comparativo"]["D016"]["linhas_atendidas"] == 0
