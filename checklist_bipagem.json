@@ -840,9 +840,9 @@
       "end_sistema": "0300801101",
       "end_bipado": null,
       "bipado_por": null,
-      "status": "aberta",
+      "status": "corrigida",
       "detectada_em": "2026-09-29T07:06:47",
-      "corrigida_em": null,
+      "corrigida_em": "2026-09-30T15:27:47",
       "categoria": "nao-bipado",
       "divergencia": "Não bipado"
     },
@@ -862,9 +862,9 @@
       "end_sistema": "0300406303",
       "end_bipado": null,
       "bipado_por": null,
-      "status": "aberta",
+      "status": "corrigida",
       "detectada_em": "2026-09-29T07:06:47",
-      "corrigida_em": null,
+      "corrigida_em": "2026-09-30T15:27:47",
       "categoria": "nao-bipado",
       "divergencia": "Não bipado"
     },
@@ -884,9 +884,9 @@
       "end_sistema": "",
       "end_bipado": null,
       "bipado_por": null,
-      "status": "aberta",
+      "status": "corrigida",
       "detectada_em": "2026-09-29T07:06:47",
-      "corrigida_em": null,
+      "corrigida_em": "2026-09-30T15:27:47",
       "categoria": "nao-bipado",
       "divergencia": "Não bipado"
     },
@@ -902,15 +902,15 @@
       "resp_tipo": "externo",
       "matricula": "5427",
       "saldo_sistema": 131.0,
-      "saldo_contado": null,
+      "saldo_contado": 127.0,
       "end_sistema": "0310515101",
       "end_bipado": null,
-      "bipado_por": null,
+      "bipado_por": "Fernando Sousa",
       "status": "aberta",
       "detectada_em": "2026-09-29T07:06:47",
       "corrigida_em": null,
-      "categoria": "nao-bipado",
-      "divergencia": "Não bipado"
+      "categoria": "negativo",
+      "divergencia": "−4"
     },
     {
       "id": "2026-09-28|826311|5427",
@@ -924,15 +924,15 @@
       "resp_tipo": "externo",
       "matricula": "5427",
       "saldo_sistema": 1.0,
-      "saldo_contado": null,
+      "saldo_contado": 0.0,
       "end_sistema": "0300509101",
       "end_bipado": null,
-      "bipado_por": null,
+      "bipado_por": "Fernando Sousa",
       "status": "aberta",
       "detectada_em": "2026-09-29T07:06:47",
       "corrigida_em": null,
-      "categoria": "nao-bipado",
-      "divergencia": "Não bipado"
+      "categoria": "negativo",
+      "divergencia": "−1"
     },
     {
       "id": "2026-09-28|826319|5427",
@@ -946,15 +946,15 @@
       "resp_tipo": "externo",
       "matricula": "5427",
       "saldo_sistema": 7.0,
-      "saldo_contado": null,
+      "saldo_contado": 6.0,
       "end_sistema": "0300507401",
       "end_bipado": null,
-      "bipado_por": null,
+      "bipado_por": "Fernando Sousa",
       "status": "aberta",
       "detectada_em": "2026-09-29T07:06:47",
       "corrigida_em": null,
-      "categoria": "nao-bipado",
-      "divergencia": "Não bipado"
+      "categoria": "negativo",
+      "divergencia": "−1"
     },
     {
       "id": "2026-09-28|865806|5427",
@@ -968,15 +968,15 @@
       "resp_tipo": "externo",
       "matricula": "5427",
       "saldo_sistema": 12.0,
-      "saldo_contado": null,
+      "saldo_contado": 10.0,
       "end_sistema": "0300505401",
       "end_bipado": null,
-      "bipado_por": null,
+      "bipado_por": "Fernando Sousa",
       "status": "aberta",
       "detectada_em": "2026-09-29T07:06:47",
       "corrigida_em": null,
-      "categoria": "nao-bipado",
-      "divergencia": "Não bipado"
+      "categoria": "negativo",
+      "divergencia": "−2"
     },
     {
       "id": "2026-09-28|804427|5427",
@@ -990,15 +990,15 @@
       "resp_tipo": "externo",
       "matricula": "5427",
       "saldo_sistema": 60.0,
-      "saldo_contado": null,
+      "saldo_contado": 58.0,
       "end_sistema": "0300513101",
       "end_bipado": null,
-      "bipado_por": null,
+      "bipado_por": "Fernando Sousa",
       "status": "aberta",
       "detectada_em": "2026-09-29T07:06:47",
       "corrigida_em": null,
-      "categoria": "nao-bipado",
-      "divergencia": "Não bipado"
+      "categoria": "negativo",
+      "divergencia": "−2"
     },
     {
       "id": "2026-09-28|804256|5427",
@@ -1012,15 +1012,15 @@
       "resp_tipo": "externo",
       "matricula": "5427",
       "saldo_sistema": 174.0,
-      "saldo_contado": null,
+      "saldo_contado": 166.0,
       "end_sistema": "0300601201",
       "end_bipado": null,
-      "bipado_por": null,
+      "bipado_por": "Fernando Sousa",
       "status": "aberta",
       "detectada_em": "2026-09-29T07:06:47",
       "corrigida_em": null,
-      "categoria": "nao-bipado",
-      "divergencia": "Não bipado"
+      "categoria": "negativo",
+      "divergencia": "−8"
     },
     {
       "id": "2026-09-28|804414|5427",
@@ -1034,15 +1034,15 @@
       "resp_tipo": "externo",
       "matricula": "5427",
       "saldo_sistema": 58.0,
-      "saldo_contado": null,
+      "saldo_contado": 53.0,
       "end_sistema": "0300511101",
       "end_bipado": null,
-      "bipado_por": null,
+      "bipado_por": "Fernando Sousa",
       "status": "aberta",
       "detectada_em": "2026-09-29T07:06:47",
       "corrigida_em": null,
-      "categoria": "nao-bipado",
-      "divergencia": "Não bipado"
+      "categoria": "negativo",
+      "divergencia": "−5"
     },
     {
       "id": "2026-09-28|803997|5427",
@@ -1056,15 +1056,15 @@
       "resp_tipo": "externo",
       "matricula": "5427",
       "saldo_sistema": 11.0,
-      "saldo_contado": null,
+      "saldo_contado": 10.0,
       "end_sistema": "0310316401",
       "end_bipado": null,
-      "bipado_por": null,
+      "bipado_por": "Fernando Sousa",
       "status": "aberta",
       "detectada_em": "2026-09-29T07:06:47",
       "corrigida_em": null,
-      "categoria": "nao-bipado",
-      "divergencia": "Não bipado"
+      "categoria": "negativo",
+      "divergencia": "−1"
     },
     {
       "id": "2026-09-28|513535|5427",
@@ -1082,9 +1082,9 @@
       "end_sistema": "0300801104",
       "end_bipado": null,
       "bipado_por": null,
-      "status": "aberta",
+      "status": "corrigida",
       "detectada_em": "2026-09-29T07:06:47",
-      "corrigida_em": null,
+      "corrigida_em": "2026-09-30T15:27:47",
       "categoria": "nao-bipado",
       "divergencia": "Não bipado"
     },
@@ -1258,9 +1258,9 @@
       "end_sistema": "0300503101",
       "end_bipado": null,
       "bipado_por": null,
-      "status": "aberta",
+      "status": "corrigida",
       "detectada_em": "2026-09-30T07:12:42",
-      "corrigida_em": null,
+      "corrigida_em": "2026-09-30T15:27:47",
       "categoria": "nao-bipado",
       "divergencia": "Não bipado"
     },
@@ -1276,15 +1276,15 @@
       "resp_tipo": "",
       "matricula": "1868",
       "saldo_sistema": 58.0,
-      "saldo_contado": 58.0,
+      "saldo_contado": 50.0,
       "end_sistema": "0300513101",
       "end_bipado": "0300505401",
       "bipado_por": "Luan araujo",
       "status": "aberta",
       "detectada_em": "2026-09-30T07:12:42",
       "corrigida_em": null,
-      "categoria": "endereco",
-      "divergencia": "Endereço incorreto"
+      "categoria": "negativo",
+      "divergencia": "−8"
     }
   ],
   "ultimo_dia_auditado": "2026-09-29"
