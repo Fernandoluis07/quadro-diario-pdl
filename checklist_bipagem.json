@@ -1241,7 +1241,51 @@
       "corrigida_em": "2026-09-29T16:46:49",
       "categoria": "nao-bipado",
       "divergencia": "Não bipado"
+    },
+    {
+      "id": "2026-09-29|826366|4058",
+      "data": "29/09/2026",
+      "data_iso": "2026-09-29",
+      "codigo": "826366",
+      "descricao": "CAMISA POLO FEMININA CINZA FS TAM P",
+      "un": "UN",
+      "tipo_mov": "202",
+      "responsavel": "Fernando Luis",
+      "resp_tipo": "",
+      "matricula": "4058",
+      "saldo_sistema": 32.0,
+      "saldo_contado": null,
+      "end_sistema": "0300503101",
+      "end_bipado": null,
+      "bipado_por": null,
+      "status": "aberta",
+      "detectada_em": "2026-09-30T07:12:42",
+      "corrigida_em": null,
+      "categoria": "nao-bipado",
+      "divergencia": "Não bipado"
+    },
+    {
+      "id": "2026-09-29|804427|1868",
+      "data": "29/09/2026",
+      "data_iso": "2026-09-29",
+      "codigo": "804427",
+      "descricao": "CAMISA COMUM OP M CZ P",
+      "un": "PEC",
+      "tipo_mov": "201",
+      "responsavel": "Luan Okada",
+      "resp_tipo": "",
+      "matricula": "1868",
+      "saldo_sistema": 58.0,
+      "saldo_contado": 58.0,
+      "end_sistema": "0300513101",
+      "end_bipado": "0300505401",
+      "bipado_por": "Luan araujo",
+      "status": "aberta",
+      "detectada_em": "2026-09-30T07:12:42",
+      "corrigida_em": null,
+      "categoria": "endereco",
+      "divergencia": "Endereço incorreto"
     }
   ],
-  "ultimo_dia_auditado": "2026-09-28"
+  "ultimo_dia_auditado": "2026-09-29"
 }
