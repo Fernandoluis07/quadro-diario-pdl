@@ -1302,9 +1302,9 @@
       "end_sistema": "",
       "end_bipado": null,
       "bipado_por": null,
-      "status": "aberta",
+      "status": "corrigida",
       "detectada_em": "2026-10-01T07:30:41",
-      "corrigida_em": null,
+      "corrigida_em": "2026-10-01T13:44:17",
       "categoria": "nao-bipado",
       "divergencia": "Não bipado"
     },
@@ -1324,9 +1324,9 @@
       "end_sistema": "",
       "end_bipado": null,
       "bipado_por": null,
-      "status": "aberta",
+      "status": "corrigida",
       "detectada_em": "2026-10-01T07:30:41",
-      "corrigida_em": null,
+      "corrigida_em": "2026-10-01T13:44:17",
       "categoria": "nao-bipado",
       "divergencia": "Não bipado"
     }

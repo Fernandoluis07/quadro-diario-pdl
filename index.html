@@ -2456,7 +2456,7 @@ document.getElementById('checklistExportBtn').addEventListener('click', () => {
 /* FASE 2 (2026-09-27): gravada junto com checklist_bipagem.json (mesmo dict) pelo Cabeçalho e pela
    Checklist 2.0 — ver backend/checklist_bipagem.py. Só divergências ABERTAS; o saldo do sistema e o
    endereço ficam congelados com a divergência. 21–24/09 (teste da Fase 1) não entram. */
-const CHECKLIST_BIPAGEM = {"meta":{"ultimo_dia_auditado":"2026-09-30","atualizado_em":"2026-10-01T07:30:41"},"rows":[{"id":"2026-09-30|520706|4058","data":"30/09/2026","data_iso":"2026-09-30","codigo":"520706","descricao":"CABO INSTR 300V 1 COND 1,5MM2","un":"M","tipo_mov":"311","responsavel":"Fernando Luis","resp_tipo":"","matricula":"4058","saldo_sistema":0.0,"saldo_contado":null,"end_sistema":"","end_bipado":null,"bipado_por":null,"status":"aberta","detectada_em":"2026-10-01T07:30:41","corrigida_em":null,"categoria":"nao-bipado","divergencia":"Não bipado"},{"id":"2026-09-30|520706|4833","data":"30/09/2026","data_iso":"2026-09-30","codigo":"520706","descricao":"CABO INSTR 300V 1 COND 1,5MM2","un":"M","tipo_mov":"601","responsavel":"Keren","resp_tipo":"externo","matricula":"4833","saldo_sistema":0.0,"saldo_contado":null,"end_sistema":"","end_bipado":null,"bipado_por":null,"status":"aberta","detectada_em":"2026-10-01T07:30:41","corrigida_em":null,"categoria":"nao-bipado","divergencia":"Não bipado"}]};
+const CHECKLIST_BIPAGEM = {"meta":{"ultimo_dia_auditado":"2026-09-30","atualizado_em":"2026-10-01T13:44:17"},"rows":[]};
 
 function bipFmtNum(n){
   return n == null ? '—' : n.toLocaleString('pt-BR', {maximumFractionDigits:3});
