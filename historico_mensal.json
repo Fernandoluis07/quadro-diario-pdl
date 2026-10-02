@@ -3088,5 +3088,103 @@
         }
       }
     }
+  },
+  "2026-10": {
+    "linhas_atendidas_mes": 40,
+    "valor_atendido_mes": -22121.0,
+    "reservas_mes": 9,
+    "ordens_mes": 31,
+    "intercompany_mes": 0,
+    "transferencias_mes": 0,
+    "diversos_mes": 0,
+    "top5_centro_custo": [
+      {
+        "centro_custo": "2003LAB",
+        "qtd": 3
+      },
+      {
+        "centro_custo": "2003REC",
+        "qtd": 3
+      },
+      {
+        "centro_custo": "2003ELA",
+        "qtd": 2
+      },
+      {
+        "centro_custo": "2003UTL",
+        "qtd": 1
+      }
+    ],
+    "notas_recebidas_mes": 14,
+    "valor_recebido_mes": 45336.16,
+    "inventario_rotativo_mes": 54,
+    "estornos_qtd_mes": 0,
+    "estornos_valor_mes": 0.0,
+    "comparativo": {
+      "D009": {
+        "linhas_atendidas": 40,
+        "notas_recebidas": 14,
+        "estornos_qtd": 0,
+        "inventario_rotativo": 54,
+        "valor_atendido": 22121.0,
+        "valor_estornado": 0.0,
+        "valor_recebido": 45336.16,
+        "diario": {
+          "linhas_atendidas": [
+            40
+          ],
+          "notas_recebidas": [
+            14
+          ],
+          "estornos_qtd": [
+            0
+          ],
+          "inventario_rotativo": [
+            54
+          ],
+          "valor_atendido": [
+            22121.0
+          ],
+          "valor_estornado": [
+            0.0
+          ],
+          "valor_recebido": [
+            45336.16
+          ]
+        }
+      },
+      "D016": {
+        "linhas_atendidas": 0,
+        "notas_recebidas": 8,
+        "estornos_qtd": 0,
+        "inventario_rotativo": 9,
+        "valor_atendido": 0.0,
+        "valor_estornado": 0.0,
+        "valor_recebido": 25841.33,
+        "diario": {
+          "linhas_atendidas": [
+            0
+          ],
+          "notas_recebidas": [
+            8
+          ],
+          "estornos_qtd": [
+            0
+          ],
+          "inventario_rotativo": [
+            9
+          ],
+          "valor_atendido": [
+            0.0
+          ],
+          "valor_estornado": [
+            0.0
+          ],
+          "valor_recebido": [
+            25841.33
+          ]
+        }
+      }
+    }
   }
 }
