@@ -6,7 +6,8 @@ import pytest
 from backend import planilha_manual
 
 
-def _escrever_planilha(caminho, indicadores_linhas=None, pontos_avisos_linhas=None, datas_importantes_linhas=None):
+def _escrever_planilha(caminho, indicadores_linhas=None, pontos_avisos_linhas=None, datas_importantes_linhas=None,
+                       nome_coluna_nf="NF Pendente Faturamento"):
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
 
@@ -14,7 +15,7 @@ def _escrever_planilha(caminho, indicadores_linhas=None, pontos_avisos_linhas=No
     aba1.append(["Quadro Diário PDL – Indicadores Manuais"])
     aba1.append(["Preencher uma linha por dia."])
     aba1.append([])
-    aba1.append(["Data", "Notas Aguardando Lancamento", "NF Pendente Faturamento", "Devolucao", "Scanner Documentos", "Intercompany"])
+    aba1.append(["Data", "Notas Aguardando Lancamento", nome_coluna_nf, "Devolucao", "Scanner Documentos", "Intercompany"])
     for linha in indicadores_linhas or []:
         aba1.append(linha)
 
@@ -57,6 +58,16 @@ def test_le_uma_linha_por_dia_com_as_5_chaves(tmp_path):
         "intercompany": 2,
     }
     assert resultado["2026-08-11"]["intercompany"] == 0
+
+
+def test_coluna_nf_renomeada_pra_nf_com_divergencia_continua_lida(tmp_path):
+    """Planilha real em 2026-09-30: coluna C virou " NF com Divergência" (com espaço na
+    frente) — mesmo indicador, mesma chave interna."""
+    for nome in (" NF com Divergência", "NF COM DIVERGENCIA", "NF Pendente Faturamento"):
+        caminho = _escrever_planilha(
+            tmp_path / "manual.xlsx", indicadores_linhas=[["29/09/2026", 0, 5, 5, 0, 0]], nome_coluna_nf=nome
+        )
+        assert planilha_manual.ler_indicadores_diarios(caminho)["2026-09-29"]["nf_pendente_faturamento"] == 5
 
 
 def test_planilha_vazia_retorna_dict_vazio(tmp_path):

@@ -42,6 +42,14 @@ _COLUNAS_INDICADORES = {
     "Intercompany": "intercompany",
 }
 
+# nomes alternativos aceitos no cabeçalho da planilha -> nome canônico acima. A coluna C foi
+# renomeada na planilha pra "NF com Divergência" em 2026-09-30 (mesmo nome do card 12 do
+# Início, ver html_writer.py) e o Cabeçalho parou com "não encontrei a linha de cabeçalho" —
+# a chave interna continua nf_pendente_faturamento. Comparação sem acento/caixa/espaço sobrando.
+_APELIDOS_CABECALHO = {
+    "NF COM DIVERGENCIA": "NF Pendente Faturamento",
+}
+
 _COLUNAS_DATAS_IMPORTANTES = {"Nome", "Periodo Inicio", "Periodo Fim", "Duracao (dias)", "Aprovacao", "Status"}
 
 _SECAO_PONTOS_ATENCAO = "PONTOS DE ATENCAO"
@@ -56,12 +64,19 @@ def sem_acento_maiusculo(texto: str) -> str:
     return sem_acento.strip().upper()
 
 
+def _nome_coluna(valor: object) -> str:
+    """Cabeçalho como está na planilha, sem espaço nas pontas, trocando apelido conhecido
+    (ver _APELIDOS_CABECALHO) pelo nome canônico."""
+    texto = str(valor).strip()
+    return _APELIDOS_CABECALHO.get(sem_acento_maiusculo(texto), texto)
+
+
 def _detectar_linha_cabecalho(caminho: str, sheet_name: str, colunas_esperadas: set[str], max_linhas: int = 15) -> int:
     """Mesma ideia de extratos._detectar_linha_cabecalho, mas com sheet_name — as abas
     desta planilha têm um bloco de título/instruções antes do cabeçalho de verdade."""
     bruto = pd.read_excel(caminho, sheet_name=sheet_name, header=None, nrows=max_linhas, dtype=object)
     for i, row in bruto.iterrows():
-        valores = {str(v).strip() for v in row.values if pd.notna(v)}
+        valores = {_nome_coluna(v) for v in row.values if pd.notna(v)}
         if colunas_esperadas.issubset(valores):
             return i
     raise ValueError(
@@ -75,7 +90,7 @@ def ler_indicadores_diarios(caminho: str) -> dict[str, dict]:
     colunas_esperadas = {"Data", *_COLUNAS_INDICADORES}
     linha_cabecalho = _detectar_linha_cabecalho(caminho, ABA_INDICADORES, colunas_esperadas)
     df = pd.read_excel(caminho, sheet_name=ABA_INDICADORES, header=linha_cabecalho, dtype=object)
-    df.columns = [str(c).strip() for c in df.columns]
+    df.columns = [_nome_coluna(c) for c in df.columns]
     df = df.dropna(subset=["Data"]).reset_index(drop=True)
 
     if df.empty:
