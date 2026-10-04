@@ -90,7 +90,7 @@
             0,
             0,
             2,
-            0,
+            1,
             1,
             21,
             0,
@@ -1567,7 +1567,7 @@
         "qtd": 51
       }
     ],
-    "notas_recebidas_mes": 193,
+    "notas_recebidas_mes": 194,
     "valor_recebido_mes": 1110804.63,
     "inventario_rotativo_mes": 1334,
     "estornos_qtd_mes": 18,
@@ -1575,7 +1575,7 @@
     "comparativo": {
       "D009": {
         "linhas_atendidas": 1286,
-        "notas_recebidas": 193,
+        "notas_recebidas": 194,
         "estornos_qtd": 18,
         "inventario_rotativo": 1334,
         "valor_atendido": 1360823.33,
@@ -1616,7 +1616,7 @@
             60
           ],
           "notas_recebidas": [
-            20,
+            21,
             61,
             16,
             0,
@@ -2140,7 +2140,7 @@
           "notas_recebidas": [
             0,
             0,
-            40,
+            41,
             3,
             14,
             35,
@@ -2611,7 +2611,7 @@
         "qtd": 42
       }
     ],
-    "notas_recebidas_mes": 186,
+    "notas_recebidas_mes": 188,
     "valor_recebido_mes": 1665028.99,
     "inventario_rotativo_mes": 1170,
     "estornos_qtd_mes": 102,
@@ -2619,7 +2619,7 @@
     "comparativo": {
       "D009": {
         "linhas_atendidas": 1065,
-        "notas_recebidas": 186,
+        "notas_recebidas": 188,
         "estornos_qtd": 102,
         "inventario_rotativo": 1170,
         "valor_atendido": 1945355.92,
@@ -2662,12 +2662,12 @@
             6,
             1,
             30,
-            17,
+            18,
             20,
             0,
             5,
             0,
-            1,
+            2,
             0,
             15,
             0,
@@ -2683,7 +2683,7 @@
             4,
             2,
             19,
-            15,
+            16,
             2,
             0,
             2,

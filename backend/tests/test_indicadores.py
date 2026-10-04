@@ -54,6 +54,20 @@ def test_recebimentos_dedup_por_referencia_nao_por_linha_nem_material():
     assert indicadores.recebimentos(df, "D009", HOJE) == 2
 
 
+def test_recebimentos_nota_estornada_no_mesmo_dia_continua_contando():
+    """Contagem bruta (Fernando 2026-10-03): o 102 conta em Estornos e NÃO tira a nota de
+    Recebimentos, nem quando estorna a nota inteira. Caso real: 13017-1 em 25/09/2026."""
+    df = _mb51(
+        [
+            {"Material": "812896", "Referência": "13017-1", "Qtd.  UM registro": 1, "_deposito_norm": "D009", "_bwart_norm": "101", "_data_norm": HOJE},
+            {"Material": "812896", "Referência": "13017-1", "Qtd.  UM registro": -1, "_deposito_norm": "D009", "_bwart_norm": "102", "_data_norm": HOJE},
+            {"Material": "1004", "Referência": "NF-200", "Qtd.  UM registro": 5, "_deposito_norm": "D009", "_bwart_norm": "101", "_data_norm": HOJE},
+        ]
+    )
+    assert indicadores.recebimentos(df, "D009", HOJE) == 2
+    assert indicadores.estornos(df, "D009", HOJE) == 1
+
+
 def test_inventario_rotativo_sem_filtro_bwart_dedup_por_material():
     df = _mb51(
         [

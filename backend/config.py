@@ -60,9 +60,9 @@ DEPOSITOS_VALIDOS = {DEPOSITO_D009, DEPOSITO_D016}
 # Tipos de movimento (BWART) por categoria — Bloco 1 (fonte MB51).
 BWART_ATENDIMENTO = {"201", "221", "261", "601", "122", "833", "921"}
 # 102 = estorno de recebimento (101) — entra como Estorno por decisão de Fernando 2026-09-28
-# (970 linhas na MB51 ficavam fora de todos os grupos).
+# (970 linhas na MB51 ficavam fora de todos os grupos). O 102 NÃO tira a nota de Recebimentos
+# (2026-10-03: contagem bruta, ver indicadores.referencias_recebidas).
 BWART_ESTORNO = {"202", "222", "262", "602", "834", "123", "102"}
-BWART_ESTORNO_RECEBIMENTO = {"102"}
 BWART_RECEBIMENTO = {"101", "835"}
 # 601/833 também entram em BWART_ATENDIMENTO acima — Intercompany é uma leitura adicional
 # sobre as MESMAS movimentações (por documento único, não por linha), não uma categoria à parte.

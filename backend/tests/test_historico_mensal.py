@@ -169,9 +169,9 @@ def test_data_fim_antes_de_data_inicio_lanca_erro(tmp_path):
         )
 
 
-def test_102_e_estorno_com_valor_absoluto_e_nota_estornada_inteira_nao_conta(tmp_path):
-    """55216-1: 101 e 102 de 16 un no mesmo mês -> não é nota recebida; o 102 entra em Estornos
-    com valor em módulo (Fernando 2026-09-28). Estorno parcial não tira a nota."""
+def test_102_e_estorno_com_valor_absoluto_e_nota_estornada_continua_recebida(tmp_path):
+    """55216-1: 101 e 102 de 16 un no mesmo mês -> continua nota recebida (contagem bruta,
+    Fernando 2026-10-03); o 102 entra em Estornos com valor em módulo (Fernando 2026-09-28)."""
     linhas = [
         _linha("552558", "D009", 101, "04.09.2026", "55216-1", valor=26837.78),
         _linha("552558", "D009", 102, "04.09.2026", "55216-1", valor=-26837.78),
@@ -183,7 +183,7 @@ def test_102_e_estorno_com_valor_absoluto_e_nota_estornada_inteira_nao_conta(tmp
     linhas[2]["Qtd.  UM registro"], linhas[3]["Qtd.  UM registro"] = 10, -4
     bases_dir = _preparar_mb51(tmp_path, linhas)
     mes = historico_mensal.calcular_historico_mensal(datetime.date(2026, 9, 1), datetime.date(2026, 9, 30), bases_dir=bases_dir)["2026-09"]
-    assert mes["notas_recebidas_mes"] == 1  # só NF-P (estorno parcial)
+    assert mes["notas_recebidas_mes"] == 2  # 55216-1 (estornada por inteiro) e NF-P (parcial)
     assert mes["estornos_qtd_mes"] == 3
     assert mes["estornos_valor_mes"] == 26837.78 + 40.0 + 10.0
 

@@ -20,11 +20,11 @@
       ],
       "saldo_contado": 174.0,
       "end_sistema": "0300601201",
-      "end_bipado": "0300612201",
+      "end_bipado": "",
       "bipado_por": "Luan araujo",
-      "status": "corrigida",
+      "status": "aberta",
       "detectada_em": "2026-09-28T07:15:37",
-      "corrigida_em": "2026-09-28T23:48:10",
+      "corrigida_em": null,
       "categoria": "endereco",
       "divergencia": "Endereço incorreto"
     },
@@ -453,15 +453,15 @@
         3.0,
         2.0
       ],
-      "saldo_contado": null,
+      "saldo_contado": 1.0,
       "end_sistema": "0300501401",
       "end_bipado": null,
-      "bipado_por": null,
-      "status": "corrigida",
+      "bipado_por": "Geovane abreu",
+      "status": "aberta",
       "detectada_em": "2026-09-28T07:15:37",
-      "corrigida_em": "2026-09-28T13:14:03",
-      "categoria": "nao-bipado",
-      "divergencia": "Não bipado"
+      "corrigida_em": null,
+      "categoria": "negativo",
+      "divergencia": "−1"
     },
     {
       "id": "2026-09-25|865834|1868",
@@ -479,15 +479,15 @@
         3.0,
         2.0
       ],
-      "saldo_contado": null,
+      "saldo_contado": 2.0,
       "end_sistema": "0300501401",
-      "end_bipado": null,
-      "bipado_por": null,
-      "status": "corrigida",
+      "end_bipado": "0300607201",
+      "bipado_por": "Luan araujo",
+      "status": "aberta",
       "detectada_em": "2026-09-28T07:15:37",
-      "corrigida_em": "2026-09-28T13:29:19",
-      "categoria": "nao-bipado",
-      "divergencia": "Não bipado"
+      "corrigida_em": null,
+      "categoria": "endereco",
+      "divergencia": "Endereço incorreto"
     },
     {
       "id": "2026-09-25|512023|4873",
@@ -704,15 +704,15 @@
       "saldos_aceitos": [
         11.0
       ],
-      "saldo_contado": 11.0,
+      "saldo_contado": 0.0,
       "end_sistema": "0310316401",
-      "end_bipado": "010316401",
+      "end_bipado": null,
       "bipado_por": "Luan araujo",
-      "status": "corrigida",
+      "status": "aberta",
       "detectada_em": "2026-09-28T07:15:37",
-      "corrigida_em": "2026-09-28T23:48:10",
-      "categoria": "endereco",
-      "divergencia": "Endereço incorreto"
+      "corrigida_em": null,
+      "categoria": "negativo",
+      "divergencia": "−11"
     },
     {
       "id": "2026-09-26|826026|4895",
@@ -1327,6 +1327,28 @@
       "status": "corrigida",
       "detectada_em": "2026-10-01T07:30:41",
       "corrigida_em": "2026-10-01T13:44:17",
+      "categoria": "nao-bipado",
+      "divergencia": "Não bipado"
+    },
+    {
+      "id": "2026-09-28|804427|1868",
+      "data": "28/09/2026",
+      "data_iso": "2026-09-28",
+      "codigo": "804427",
+      "descricao": "CAMISA COMUM OP M CZ P",
+      "un": "PEC",
+      "tipo_mov": "202",
+      "responsavel": "Luan Okada",
+      "resp_tipo": "",
+      "matricula": "1868",
+      "saldo_sistema": 60.0,
+      "saldo_contado": null,
+      "end_sistema": "0300513101",
+      "end_bipado": null,
+      "bipado_por": null,
+      "status": "aberta",
+      "detectada_em": "2026-10-04T00:07:14",
+      "corrigida_em": null,
       "categoria": "nao-bipado",
       "divergencia": "Não bipado"
     }
