@@ -1358,5 +1358,13 @@
     "nf_pendente_faturamento": 5,
     "reservas_pendentes": 40,
     "pendencias_atendimento_linhas": 145
+  },
+  "2026-10-05": {
+    "notas_aguardando_lancamento": 0,
+    "devolucao": 3,
+    "scanner_documentos": 0,
+    "nf_pendente_faturamento": 7,
+    "reservas_pendentes": 29,
+    "pendencias_atendimento_linhas": 118
   }
 }

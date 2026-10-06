@@ -8911,5 +8911,53 @@
         "statusClasse": "scheduled"
       }
     ]
+  },
+  "2026-10-05": {
+    "pontos_atencao": [
+      "Estorno de materiais para o estoque, somente com chamado aprovado.",
+      "Segurança não se negocia, você tem alguém te esperando em casa."
+    ],
+    "avisos_importantes": [
+      "AGENDAMENTO #53411794   LUMI LOGISTICA  4 NF",
+      "AGENDAMENTO #53501365  ENGCLARIAN  1 NF",
+      "AGENDAMENTO #53529827 DREYMOOR  1 NF",
+      "Segunda ( FERNANDO ATE AS 19H )",
+      "Terça (LUAN ATE AS 20H)",
+      "Quarta (GEOVANE ATE AS 19)",
+      "Quinta (LUAN ATE AS 20H)",
+      "Sexta ( LUIZ ATE AS 19)"
+    ],
+    "datas_importantes": [
+      {
+        "name": "Fernando Luis",
+        "period": "17/08/26 a 05/09/26 · 20 dias",
+        "statusLabel": "Quitada",
+        "statusClasse": "done"
+      },
+      {
+        "name": "Luiz Sergio",
+        "period": "14/09/26 a 29/09/26 · 16 dias",
+        "statusLabel": "Quitada",
+        "statusClasse": "done"
+      },
+      {
+        "name": "Luan Okada",
+        "period": "14/12/26 a 03/01/27 · 20 dias",
+        "statusLabel": "Programada",
+        "statusClasse": "scheduled"
+      },
+      {
+        "name": "Milton Junior",
+        "period": "28/12/26 a 16/01/27 · 20 dias",
+        "statusLabel": "Programada",
+        "statusClasse": "scheduled"
+      },
+      {
+        "name": "Geovane Abreu",
+        "period": "04/01/27 a 27/01/27 · 24 dias",
+        "statusLabel": "Programada",
+        "statusClasse": "scheduled"
+      }
+    ]
   }
 }
