@@ -1955,5 +1955,16 @@
     "inventario_rotativo_d009": 131,
     "inventario_rotativo_d016": 9,
     "intercompany": 0
+  },
+  "2026-10-09": {
+    "linhas_atendidas_d009": 81,
+    "linhas_atendidas_d016": 15,
+    "estornos_d009": 0,
+    "estornos_d016": 0,
+    "recebimentos_d009": 11,
+    "recebimentos_d016": 7,
+    "inventario_rotativo_d009": 83,
+    "inventario_rotativo_d016": 24,
+    "intercompany": 0
   }
 }
