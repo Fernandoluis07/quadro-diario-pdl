@@ -4646,9 +4646,9 @@
       "end_sistema": "0300801103",
       "end_bipado": null,
       "bipado_por": null,
-      "status": "aberta",
+      "status": "corrigida",
       "detectada_em": "2026-10-14T07:24:28",
-      "corrigida_em": null,
+      "corrigida_em": "2026-10-14T07:41:30",
       "categoria": "nao-bipado",
       "divergencia": "Não bipado"
     },
