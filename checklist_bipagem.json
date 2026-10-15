@@ -5135,7 +5135,51 @@
       "corrigida_em": null,
       "categoria": "nao-bipado",
       "divergencia": "Não bipado"
+    },
+    {
+      "id": "2026-10-14|521941|4873",
+      "data": "14/10/2026",
+      "data_iso": "2026-10-14",
+      "codigo": "521941",
+      "descricao": "MACHO MAN HSS UNC 3/8POL 16FPP",
+      "un": "JG",
+      "tipo_mov": "261",
+      "responsavel": "Geovane Abreu",
+      "resp_tipo": "",
+      "matricula": "4873",
+      "saldo_sistema": 1.0,
+      "saldo_contado": 1.0,
+      "end_sistema": "0300206203",
+      "end_bipado": "300208315",
+      "bipado_por": "Geovane Abreu",
+      "status": "aberta",
+      "detectada_em": "2026-10-15T07:32:24",
+      "corrigida_em": null,
+      "categoria": "endereco",
+      "divergencia": "Endereço incorreto"
+    },
+    {
+      "id": "2026-10-14|806048|4873",
+      "data": "14/10/2026",
+      "data_iso": "2026-10-14",
+      "codigo": "806048",
+      "descricao": "BUCHA FIX PARAF SF 12MM 60MM ALVEN",
+      "un": "PEC",
+      "tipo_mov": "202",
+      "responsavel": "Geovane Abreu",
+      "resp_tipo": "",
+      "matricula": "4873",
+      "saldo_sistema": 92.0,
+      "saldo_contado": null,
+      "end_sistema": "0300204219",
+      "end_bipado": null,
+      "bipado_por": null,
+      "status": "aberta",
+      "detectada_em": "2026-10-15T07:32:24",
+      "corrigida_em": null,
+      "categoria": "nao-bipado",
+      "divergencia": "Não bipado"
     }
   ],
-  "ultimo_dia_auditado": "2026-10-13"
+  "ultimo_dia_auditado": "2026-10-14"
 }
