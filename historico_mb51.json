@@ -1988,5 +1988,16 @@
     "inventario_rotativo_d009": 24,
     "inventario_rotativo_d016": 0,
     "intercompany": 0
+  },
+  "2026-10-15": {
+    "linhas_atendidas_d009": 18,
+    "linhas_atendidas_d016": 0,
+    "estornos_d009": 0,
+    "estornos_d016": 0,
+    "recebimentos_d009": 4,
+    "recebimentos_d016": 0,
+    "inventario_rotativo_d009": 23,
+    "inventario_rotativo_d016": 0,
+    "intercompany": 0
   }
 }
