@@ -6345,7 +6345,51 @@
       "corrigida_em": null,
       "categoria": "positivo",
       "divergencia": "+3"
+    },
+    {
+      "id": "2026-10-20|808208|4873",
+      "data": "20/10/2026",
+      "data_iso": "2026-10-20",
+      "codigo": "808208",
+      "descricao": "LUVA SEG QUIM NBR AZ TAM: G CA 42879",
+      "un": "CX",
+      "tipo_mov": "201",
+      "responsavel": "Geovane Abreu",
+      "resp_tipo": "",
+      "matricula": "4873",
+      "saldo_sistema": 44.0,
+      "saldo_contado": null,
+      "end_sistema": "0300601101",
+      "end_bipado": null,
+      "bipado_por": null,
+      "status": "aberta",
+      "detectada_em": "2026-10-21T07:23:14",
+      "corrigida_em": null,
+      "categoria": "nao-bipado",
+      "divergencia": "Não bipado"
+    },
+    {
+      "id": "2026-10-20|811612|1868",
+      "data": "20/10/2026",
+      "data_iso": "2026-10-20",
+      "codigo": "811612",
+      "descricao": "BALDE GRAD TP PT 12L",
+      "un": "UN",
+      "tipo_mov": "201",
+      "responsavel": "Luan Okada",
+      "resp_tipo": "",
+      "matricula": "1868",
+      "saldo_sistema": 7.0,
+      "saldo_contado": null,
+      "end_sistema": "0310515401",
+      "end_bipado": null,
+      "bipado_por": null,
+      "status": "aberta",
+      "detectada_em": "2026-10-21T07:23:14",
+      "corrigida_em": null,
+      "categoria": "nao-bipado",
+      "divergencia": "Não bipado"
     }
   ],
-  "ultimo_dia_auditado": "2026-10-19"
+  "ultimo_dia_auditado": "2026-10-20"
 }
