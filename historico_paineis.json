@@ -9539,18 +9539,6 @@
     "avisos_importantes": [],
     "datas_importantes": [
       {
-        "name": "Fernando Luis",
-        "period": "17/08/26 a 05/09/26 · 20 dias",
-        "statusLabel": "Quitada",
-        "statusClasse": "done"
-      },
-      {
-        "name": "Luiz Sergio",
-        "period": "14/09/26 a 29/09/26 · 16 dias",
-        "statusLabel": "Quitada",
-        "statusClasse": "done"
-      },
-      {
         "name": "Luan Okada",
         "period": "14/12/26 a 03/01/27 · 20 dias",
         "statusLabel": "Programada",
@@ -9564,7 +9552,13 @@
       },
       {
         "name": "Geovane Abreu",
-        "period": "04/01/27 a 27/01/27 · 24 dias",
+        "period": "05/04/27 a 14/04/27 · 9 dias",
+        "statusLabel": "Programada",
+        "statusClasse": "scheduled"
+      },
+      {
+        "name": "Geovane Abreu",
+        "period": "05/07/27 a 18/07/27 · 13 dias",
         "statusLabel": "Programada",
         "statusClasse": "scheduled"
       }
