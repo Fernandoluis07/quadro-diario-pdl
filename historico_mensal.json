@@ -3090,29 +3090,29 @@
     }
   },
   "2026-10": {
-    "linhas_atendidas_mes": 781,
-    "valor_atendido_mes": -777810.88,
-    "reservas_mes": 434,
-    "ordens_mes": 288,
-    "intercompany_mes": 51,
+    "linhas_atendidas_mes": 810,
+    "valor_atendido_mes": -828127.28,
+    "reservas_mes": 459,
+    "ordens_mes": 290,
+    "intercompany_mes": 53,
     "transferencias_mes": 5,
     "diversos_mes": 3,
     "top5_centro_custo": [
       {
-        "centro_custo": "2003PRD",
-        "qtd": 107
+        "centro_custo": "2003UTL",
+        "qtd": 113
       },
       {
-        "centro_custo": "2003UTL",
-        "qtd": 103
+        "centro_custo": "2003PRD",
+        "qtd": 113
       },
       {
         "centro_custo": "2003REC",
-        "qtd": 53
+        "qtd": 58
       },
       {
         "centro_custo": "2003LAB",
-        "qtd": 41
+        "qtd": 42
       },
       {
         "centro_custo": "2003MEC",
@@ -3121,17 +3121,17 @@
     ],
     "notas_recebidas_mes": 107,
     "valor_recebido_mes": 505689.86,
-    "inventario_rotativo_mes": 828,
-    "estornos_qtd_mes": 34,
-    "estornos_valor_mes": 99467.59,
+    "inventario_rotativo_mes": 859,
+    "estornos_qtd_mes": 39,
+    "estornos_valor_mes": 124553.32,
     "comparativo": {
       "D009": {
-        "linhas_atendidas": 781,
+        "linhas_atendidas": 810,
         "notas_recebidas": 107,
-        "estornos_qtd": 34,
-        "inventario_rotativo": 828,
-        "valor_atendido": 777810.88,
-        "valor_estornado": 99467.59,
+        "estornos_qtd": 39,
+        "inventario_rotativo": 859,
+        "valor_atendido": 828127.28,
+        "valor_estornado": 124553.32,
         "valor_recebido": 505689.86,
         "diario": {
           "linhas_atendidas": [
@@ -3156,7 +3156,8 @@
             28,
             35,
             36,
-            74
+            74,
+            29
           ],
           "notas_recebidas": [
             14,
@@ -3180,7 +3181,8 @@
             13,
             0,
             1,
-            2
+            2,
+            0
           ],
           "estornos_qtd": [
             0,
@@ -3204,7 +3206,8 @@
             0,
             0,
             0,
-            2
+            2,
+            5
           ],
           "inventario_rotativo": [
             54,
@@ -3228,7 +3231,8 @@
             43,
             31,
             31,
-            69
+            69,
+            31
           ],
           "valor_atendido": [
             22121.0,
@@ -3252,7 +3256,8 @@
             148630.7,
             4180.21,
             23443.73,
-            101062.73
+            101062.73,
+            50316.4
           ],
           "valor_estornado": [
             0.0,
@@ -3276,7 +3281,8 @@
             0.0,
             0.0,
             0.0,
-            712.75
+            712.75,
+            25085.73
           ],
           "valor_recebido": [
             45336.16,
@@ -3300,7 +3306,8 @@
             18568.52,
             0.0,
             1750.49,
-            18951.75
+            18951.75,
+            0.0
           ]
         }
       },
@@ -3335,7 +3342,8 @@
             16,
             0,
             1,
-            12
+            12,
+            0
           ],
           "notas_recebidas": [
             8,
@@ -3359,9 +3367,11 @@
             1,
             0,
             0,
-            1
+            1,
+            0
           ],
           "estornos_qtd": [
+            0,
             0,
             0,
             0,
@@ -3407,7 +3417,8 @@
             13,
             0,
             1,
-            11
+            11,
+            0
           ],
           "valor_atendido": [
             0.0,
@@ -3431,9 +3442,11 @@
             32493.01,
             0.0,
             1616.1,
-            30365.49
+            30365.49,
+            0.0
           ],
           "valor_estornado": [
+            0.0,
             0.0,
             0.0,
             0.0,
@@ -3479,7 +3492,8 @@
             740.15,
             0.0,
             0.0,
-            4795.39
+            4795.39,
+            0.0
           ]
         }
       }
