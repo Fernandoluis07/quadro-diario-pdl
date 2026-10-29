@@ -9645,5 +9645,44 @@
         "statusClasse": "scheduled"
       }
     ]
+  },
+  "2026-10-28": {
+    "pontos_atencao": [
+      "Estorno de materiais para o estoque, somente com chamado aprovado.",
+      "Segurança não se negocia, você tem alguém te esperando em casa.",
+      "AGENDAMENTO #54355278  LUMI LOGISTICA 1 NF",
+      "Segunda ( FERNANDO ATE AS 19H )",
+      "Terça (LUAN ATE AS 20H)",
+      "Quarta (GEOVANE ATE AS 19)",
+      "Quinta (LUAN ATE AS 20H)",
+      "Sexta ( LUIZ ATE AS 19)"
+    ],
+    "avisos_importantes": [],
+    "datas_importantes": [
+      {
+        "name": "Luan Okada",
+        "period": "14/12/26 a 03/01/27 · 20 dias",
+        "statusLabel": "Programada",
+        "statusClasse": "scheduled"
+      },
+      {
+        "name": "Milton Junior",
+        "period": "28/12/26 a 16/01/27 · 20 dias",
+        "statusLabel": "Programada",
+        "statusClasse": "scheduled"
+      },
+      {
+        "name": "Geovane Abreu",
+        "period": "05/04/27 a 14/04/27 · 10 dias",
+        "statusLabel": "Programada",
+        "statusClasse": "scheduled"
+      },
+      {
+        "name": "Geovane Abreu",
+        "period": "05/07/27 a 18/07/27 · 14 dias",
+        "statusLabel": "Programada",
+        "statusClasse": "scheduled"
+      }
+    ]
   }
 }
