@@ -3122,16 +3122,16 @@
     "notas_recebidas_mes": 113,
     "valor_recebido_mes": 587660.39,
     "inventario_rotativo_mes": 1113,
-    "estornos_qtd_mes": 44,
-    "estornos_valor_mes": 156148.34,
+    "estornos_qtd_mes": 45,
+    "estornos_valor_mes": 158374.51,
     "comparativo": {
       "D009": {
         "linhas_atendidas": 1031,
         "notas_recebidas": 113,
-        "estornos_qtd": 44,
+        "estornos_qtd": 45,
         "inventario_rotativo": 1113,
         "valor_atendido": 1010612.92,
-        "valor_estornado": 156148.34,
+        "valor_estornado": 158374.51,
         "valor_recebido": 587660.39,
         "diario": {
           "linhas_atendidas": [
@@ -3228,7 +3228,7 @@
             0,
             0,
             1,
-            1
+            2
           ],
           "inventario_rotativo": [
             54,
@@ -3324,7 +3324,7 @@
             0.0,
             0.0,
             30883.07,
-            167.49
+            2393.66
           ],
           "valor_recebido": [
             45336.16,
