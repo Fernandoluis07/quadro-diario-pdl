@@ -2142,5 +2142,16 @@
     "inventario_rotativo_d009": 43,
     "inventario_rotativo_d016": 0,
     "intercompany": 0
+  },
+  "2026-11-05": {
+    "linhas_atendidas_d009": 62,
+    "linhas_atendidas_d016": 0,
+    "estornos_d009": 2,
+    "estornos_d016": 0,
+    "recebimentos_d009": 21,
+    "recebimentos_d016": 1,
+    "inventario_rotativo_d009": 61,
+    "inventario_rotativo_d016": 1,
+    "intercompany": 0
   }
 }
