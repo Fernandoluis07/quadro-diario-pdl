@@ -105,15 +105,43 @@ def carregar_sharepoint(caminho: str) -> pd.DataFrame:
     return sp.sort_values("_dthr", kind="stable")
 
 
+def _nomes_sharepoint(v) -> list[str]:
+    """Col C da Matricula.xlsx: um ou mais nomes separados por ';' (o app de bipagem grava ora o
+    nome curto da lista, ora o nome completo da conta Microsoft — Fernando 2026-11-18: os dois
+    valem). O primeiro é o principal."""
+    return [n for n in (_nome(p) for p in _cod(v).split(";")) if n]
+
+
 def carregar_matriculas(caminho: str) -> dict[str, tuple[str, str]]:
-    """matrícula -> (nome de exibição, nome no SharePoint normalizado ou '' se fora do time)."""
+    """matrícula -> (nome de exibição, nome principal no SharePoint normalizado ou '' se fora do time)."""
     mt = pd.read_excel(caminho, sheet_name="Data")
     cad = {}
     for _, r in mt.iterrows():
         mat = _cod(r.iloc[0])
         if mat:
-            cad[mat] = (_cod(r.iloc[1]).title(), _nome(r.iloc[2]) if len(r) > 2 else "")
+            nomes = _nomes_sharepoint(r.iloc[2]) if len(r) > 2 else []
+            cad[mat] = (_cod(r.iloc[1]).title(), nomes[0] if nomes else "")
     return cad
+
+
+def carregar_apelidos(caminho: str) -> dict[str, str]:
+    """Nome alternativo normalizado -> nome principal, dos nomes extras da col C da Matricula.xlsx."""
+    mt = pd.read_excel(caminho, sheet_name="Data")
+    apelidos = {}
+    for _, r in mt.iterrows():
+        nomes = _nomes_sharepoint(r.iloc[2]) if len(r) > 2 else []
+        for n in nomes[1:]:
+            apelidos[n] = nomes[0]
+    return apelidos
+
+
+def aplicar_apelidos(sp: pd.DataFrame, apelidos: dict[str, str]) -> pd.DataFrame:
+    """Troca o operador da bipagem pelo nome principal quando ele veio com um nome alternativo."""
+    if not apelidos:
+        return sp
+    sp = sp.copy()
+    sp["_op"] = sp["_op"].map(lambda n: apelidos.get(n, n))
+    return sp
 
 
 TEMPO_LIMITE_SHAREPOINT_S = 240
@@ -595,7 +623,7 @@ def ler_bases_bipagem(data_extracao_mb51: datetime.datetime | None = None, atual
             print("\n" + "!" * 78 + f"\n!! NÃO CONSEGUI ATUALIZAR O SHARE POINT.XLSX: {e}\n"
                   "!! Seguindo com a planilha como estava. Confira a VPN/rede e rode de novo.\n" + "!" * 78)
     salvo_em = datetime.datetime.fromtimestamp(os.path.getmtime(sp_path))
-    sp = carregar_sharepoint(sp_path)
+    sp = aplicar_apelidos(carregar_sharepoint(sp_path), carregar_apelidos(mt_path))
     ultima = sp["_dthr"].max() if len(sp) else None
     print(f"Base de bipagem: {len(sp)} linhas, salva em {salvo_em:%d/%m %H:%M}, última bipagem em "
           + (f"{ultima:%d/%m/%Y %H:%M}." if ultima is not None else "(vazia)."))

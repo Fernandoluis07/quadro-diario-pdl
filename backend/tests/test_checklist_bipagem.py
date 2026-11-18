@@ -219,3 +219,28 @@ def test_gravar_escreve_json_e_constante_do_mesmo_dict(tmp_path):
     C.gravar(str(tmp_path), str(index), estado, AGORA)
     assert '"categoria":"nao-bipado"' in index.read_text(encoding="utf-8")
     assert (tmp_path / "checklist_bipagem.json").exists()
+
+
+def _matricula_xlsx(tmp_path, linhas):
+    caminho = tmp_path / "Matricula.xlsx"
+    pd.DataFrame(linhas, columns=["Nome usuário", "1º nome", "Nomes"]).to_excel(caminho, sheet_name="Data", index=False)
+    return str(caminho)
+
+
+def test_col_c_aceita_nome_curto_e_nome_completo(tmp_path):
+    """O app grava ora 'Geovane Abreu', ora 'Geovane Silva Abreu' (conta Microsoft) — os dois valem."""
+    mt = _matricula_xlsx(tmp_path, [(4873, "Geovane Abreu", "Geovane Abreu; Geovane Silva Abreu"),
+                                    (1869, "LUIZ SERGIO", "Luiz souza;Luiz Sergio de Oliveira Souza; Luiz Sergio "),
+                                    (5427, "ROGERIO", None)])
+    cad = C.carregar_matriculas(mt)
+    assert cad["4873"] == ("Geovane Abreu", "GEOVANE ABREU") and cad["5427"] == ("Rogerio", "")
+    assert C.carregar_apelidos(mt) == {"GEOVANE SILVA ABREU": "GEOVANE ABREU",
+                                       "LUIZ SERGIO DE OLIVEIRA SOUZA": "LUIZ SOUZA", "LUIZ SERGIO": "LUIZ SOUZA"}
+
+
+def test_bipagem_com_nome_completo_cobre_o_proprio_operador(tmp_path):
+    mt = _matricula_xlsx(tmp_path, [(4873, "Geovane Abreu", "Geovane Abreu; Geovane Silva Abreu")])
+    mb = _mb51([(D(2026, 9, 25), "100", "201", -1, "4873")])
+    sp = _sp([("2026-09-25 10:00", "100", "Geovane Silva Abreu", "0200100101", 9)])
+    estado, _ = _auditar(mb, C.aplicar_apelidos(sp, C.carregar_apelidos(mt)), _zmm([("100", 9, "0200100101")]))
+    assert estado["divergencias"] == []
