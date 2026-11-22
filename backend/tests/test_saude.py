@@ -310,3 +310,15 @@ def test_push_com_outro_arquivo_ou_ref_nova_nao_e_so_da_checklist(tmp_path):
 def test_faixas_do_stdin_do_hook():
     linha = "refs/heads/main aaa refs/heads/main bbb\n"
     assert saude._faixas_do_stdin(linha) == [("bbb", "aaa")]
+
+
+def test_feriados_do_site_espelham_os_do_backend():
+    """O Início do site usa HOLIDAYS pra escolher o último dia útil e o "ontem"; se divergir do
+    backend, feriado vira dia útil no site (20/11/2026 mostrou números inventados)."""
+    import os
+    import re
+    html = open(os.path.join(os.path.dirname(__file__), "..", "..", "index.html"), encoding="utf-8").read()
+    bloco = re.search(r"const HOLIDAYS = new Set\(\[(.*?)\]\);", html, re.S).group(1)
+    site = {datetime.date.fromisoformat(s) for s in re.findall(r"'(\d{4}-\d{2}-\d{2})'", bloco)}
+    assert site == saude.FERIADOS
+    assert any(d.year == 2027 for d in saude.FERIADOS)

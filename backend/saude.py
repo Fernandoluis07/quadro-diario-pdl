@@ -47,13 +47,19 @@ ARQUIVO_ALERTAS_JS = "alertas_saude.js"
 ARQUIVO_ESTADO = ".saude_estado.json"
 
 INICIO_HISTORICO = datetime.date(2026, 4, 1)
-# Feriados nacionais de 2026 (dia útil sem movimento não é "dia pulado"). A MB51 é a
-# fonte de verdade quando lida; isto só serve pro modo --rapido e pra "extração atrasada".
+# Feriados nacionais de 2026 e 2027 (dia útil sem movimento não é "dia pulado"). Decidem também
+# o que o Cabeçalho congela como dia útil e o "ontem" dos cards. ESPELHADO em HOLIDAYS no
+# index.html — mudou um, muda o outro. Acrescentar 2028 antes da virada do ano.
 FERIADOS = {
     datetime.date(2026, 1, 1), datetime.date(2026, 2, 16), datetime.date(2026, 2, 17),
     datetime.date(2026, 4, 3), datetime.date(2026, 4, 21), datetime.date(2026, 5, 1),
     datetime.date(2026, 6, 4), datetime.date(2026, 9, 7), datetime.date(2026, 10, 12),
     datetime.date(2026, 11, 2), datetime.date(2026, 11, 20), datetime.date(2026, 12, 25),
+    datetime.date(2027, 1, 1), datetime.date(2027, 2, 8), datetime.date(2027, 2, 9),
+    datetime.date(2027, 3, 26), datetime.date(2027, 4, 21), datetime.date(2027, 5, 1),
+    datetime.date(2027, 5, 27), datetime.date(2027, 9, 7), datetime.date(2027, 10, 12),
+    datetime.date(2027, 11, 2), datetime.date(2027, 11, 15), datetime.date(2027, 11, 20),
+    datetime.date(2027, 12, 25),
 }
 HORA_PRAZO_CONGELAMENTO = 11
 LIMITE_DESSINCRONIA_MIN = 60          # ZMM028 x MB51 extraídas com mais que isso de diferença
