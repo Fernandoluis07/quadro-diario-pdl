@@ -3598,49 +3598,49 @@
     }
   },
   "2026-11": {
-    "linhas_atendidas_mes": 771,
-    "valor_atendido_mes": -380820.4,
-    "reservas_mes": 524,
-    "ordens_mes": 209,
-    "intercompany_mes": 4,
+    "linhas_atendidas_mes": 823,
+    "valor_atendido_mes": -393180.32,
+    "reservas_mes": 559,
+    "ordens_mes": 218,
+    "intercompany_mes": 12,
     "transferencias_mes": 34,
     "diversos_mes": 0,
     "top5_centro_custo": [
       {
         "centro_custo": "2003REC",
-        "qtd": 106
+        "qtd": 113
       },
       {
         "centro_custo": "2003PRD",
-        "qtd": 92
+        "qtd": 96
       },
       {
         "centro_custo": "2003UTL",
-        "qtd": 63
+        "qtd": 67
       },
       {
-        "centro_custo": "2003SSO",
-        "qtd": 45
+        "centro_custo": "2003ADM",
+        "qtd": 48
       },
       {
         "centro_custo": "2003MEC",
-        "qtd": 45
+        "qtd": 47
       }
     ],
-    "notas_recebidas_mes": 106,
-    "valor_recebido_mes": 415888.36,
-    "inventario_rotativo_mes": 739,
-    "estornos_qtd_mes": 28,
-    "estornos_valor_mes": 37789.35,
+    "notas_recebidas_mes": 107,
+    "valor_recebido_mes": 416020.06,
+    "inventario_rotativo_mes": 778,
+    "estornos_qtd_mes": 33,
+    "estornos_valor_mes": 41241.2,
     "comparativo": {
       "D009": {
-        "linhas_atendidas": 771,
-        "notas_recebidas": 106,
-        "estornos_qtd": 28,
-        "inventario_rotativo": 739,
-        "valor_atendido": 380820.4,
-        "valor_estornado": 37789.35,
-        "valor_recebido": 415888.36,
+        "linhas_atendidas": 823,
+        "notas_recebidas": 107,
+        "estornos_qtd": 33,
+        "inventario_rotativo": 778,
+        "valor_atendido": 393180.32,
+        "valor_estornado": 41241.2,
+        "valor_recebido": 416020.06,
         "diario": {
           "linhas_atendidas": [
             0,
@@ -3666,7 +3666,8 @@
             15,
             0,
             39,
-            49
+            49,
+            52
           ],
           "notas_recebidas": [
             0,
@@ -3692,7 +3693,8 @@
             0,
             0,
             5,
-            0
+            0,
+            1
           ],
           "estornos_qtd": [
             0,
@@ -3718,7 +3720,8 @@
             0,
             0,
             12,
-            0
+            0,
+            5
           ],
           "inventario_rotativo": [
             0,
@@ -3744,6 +3747,7 @@
             15,
             0,
             38,
+            39,
             39
           ],
           "valor_atendido": [
@@ -3770,7 +3774,8 @@
             27200.88,
             0.0,
             2416.14,
-            18597.79
+            18597.79,
+            12359.92
           ],
           "valor_estornado": [
             0.0,
@@ -3796,7 +3801,8 @@
             0.0,
             0.0,
             0.0,
-            0.0
+            0.0,
+            3451.85
           ],
           "valor_recebido": [
             0.0,
@@ -3822,16 +3828,17 @@
             0.0,
             0.0,
             85987.48,
-            0.0
+            0.0,
+            131.7
           ]
         }
       },
       "D016": {
-        "linhas_atendidas": 16,
+        "linhas_atendidas": 19,
         "notas_recebidas": 6,
         "estornos_qtd": 0,
-        "inventario_rotativo": 22,
-        "valor_atendido": 80038.09,
+        "inventario_rotativo": 24,
+        "valor_atendido": 204015.83,
         "valor_estornado": 0.0,
         "valor_recebido": 547202.8,
         "diario": {
@@ -3859,7 +3866,8 @@
             0,
             0,
             6,
-            0
+            0,
+            3
           ],
           "notas_recebidas": [
             0,
@@ -3885,9 +3893,11 @@
             0,
             0,
             0,
+            0,
             0
           ],
           "estornos_qtd": [
+            0,
             0,
             0,
             0,
@@ -3937,7 +3947,8 @@
             0,
             0,
             6,
-            0
+            0,
+            2
           ],
           "valor_atendido": [
             0.0,
@@ -3963,9 +3974,11 @@
             0.0,
             0.0,
             0.0,
-            0.0
+            0.0,
+            123977.74
           ],
           "valor_estornado": [
+            0.0,
             0.0,
             0.0,
             0.0,
@@ -4012,6 +4025,7 @@
             0.0,
             319739.1,
             139320.72,
+            0.0,
             0.0,
             0.0,
             0.0,
